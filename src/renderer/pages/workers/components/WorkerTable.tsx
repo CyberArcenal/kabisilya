@@ -42,7 +42,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  if (workers.length === 0) {
+  if (workers?.length??0 === 0) {
     return (
       <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">
         No workers found
@@ -88,7 +88,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                 {worker.contact || "—"}
                 {worker.contact && (
                   <button
-                    onClick={() => handleCall(worker.contact)}
+                    onClick={() => handleCall(worker.contact as any)}
                     className="ml-2 p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]"
                     title="Call"
                   >
@@ -100,7 +100,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                 {worker.email || "—"}
                 {worker.email && (
                   <button
-                    onClick={() => handleEmail(worker.email)}
+                    onClick={() => handleEmail(worker.email as any)}
                     className="ml-2 p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]"
                     title="Email"
                   >

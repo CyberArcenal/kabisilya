@@ -1,4 +1,9 @@
 // src/main/ipc/pitak/get/all.ipc.js
+//@ts-check
+
+const pitakService = require("../../../../../services/PitakService");
+const { logger } = require("../../../../../utils/logger");
+
 module.exports = async function getAllPitaks(params) {
   try {
     logger.info("IPC: getAllPitaks", { params });

@@ -74,7 +74,7 @@ export const useDashboardData = () => {
         ]);
 
         const totalWorkers = workersRes.status === "fulfilled" && workersRes.value.status
-          ? workersRes.value.data.pagination.total
+          ? workersRes.value.data.pagination?.total || 0
           : 0;
 
         const completedAssignments = assignmentsStatsRes.status === "fulfilled" && assignmentsStatsRes.value.status
@@ -82,7 +82,7 @@ export const useDashboardData = () => {
           : 0;
 
         const activeAssignments = activeAssignmentsRes.status === "fulfilled" && activeAssignmentsRes.value.status
-          ? activeAssignmentsRes.value.data.pagination.total
+          ? activeAssignmentsRes.value.data.pagination?.total || 0
           : 0;
 
         const totalPaymentsMonth = paymentsMonthRes.status === "fulfilled" ? paymentsMonthRes.value : 0;

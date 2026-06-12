@@ -41,7 +41,7 @@ const AssignmentTable: React.FC<AssignmentTableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  if (assignments.length === 0) {
+  if (assignments?.length??0 === 0) {
     return (
       <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">
         No assignments found

@@ -1,4 +1,9 @@
 // src/main/ipc/worker/get/all.ipc.js
+//@ts-check
+const workerService = require("../../../../../services/WorkerService");
+const { logger } = require("../../../../../utils/logger");
+
+
 module.exports = async function getAllWorkers(params) {
   try {
     logger.info("IPC: getAllWorkers", { params });
