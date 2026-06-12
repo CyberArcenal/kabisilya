@@ -1,4 +1,4 @@
-// src/renderer/api/updater.ts
+// src/renderer/api/utils/updater.ts
 // Updater API – frontend client para sa Electron auto‑updater
 
 // ----------------------------------------------------------------------

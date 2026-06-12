@@ -1,15 +1,11 @@
-// src/renderer/api/sessionAPI.ts
-// Updated to use common pagination types and align with refactored SessionService
+// src/renderer/api/core/sessionAPI.ts
+// Fixed pagination: backend returns { data: Session[], pagination } at top level
 
 import type { Assignment } from "./assignment";
 import type { Bukid } from "./bukid";
 import type { Debt } from "./debt";
 import type { Payment } from "./payment";
 import type { PaginatedResponse, ApiResponse, BaseFilters } from "../shared";
-
-// ----------------------------------------------------------------------
-// 📦 Session-specific Types
-// ----------------------------------------------------------------------
 
 export interface Session {
   id: number;
@@ -64,10 +60,6 @@ export interface SessionFilters extends BaseFilters {
   startDateTo?: string;
 }
 
-// ----------------------------------------------------------------------
-// 🧠 SessionAPI Class (using common types)
-// ----------------------------------------------------------------------
-
 class SessionAPI {
   private channel = "session";
 
@@ -78,24 +70,26 @@ class SessionAPI {
     return window.backendAPI.session({ method, params });
   }
 
-  // 🔎 READ (with pagination)
-
-  /**
-   * Get all sessions with optional filters (paginated)
-   */
+  // READ (with pagination)
   async getAll(params?: SessionFilters): Promise<SessionsResponse> {
     try {
-      const response = await this.call<SessionsResponse>("getAllSessions", params || {});
-      if (response.status) return response;
+      const response = await this.call<any>("getAllSessions", params || {});
+      if (response.status) {
+        return {
+          status: true,
+          message: response.message,
+          data: {
+            items: response.data,           // array of sessions
+            pagination: response.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+          },
+        };
+      }
       throw new Error(response.message || "Failed to fetch sessions");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch sessions");
     }
   }
 
-  /**
-   * Get session by ID
-   */
   async getById(id: number): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -107,10 +101,6 @@ class SessionAPI {
     }
   }
 
-  /**
-   * Get the currently active session (status = 'active')
-   * Note: This returns a single session object, not paginated.
-   */
   async getActive(): Promise<SessionResponse> {
     try {
       const response = await this.call<SessionResponse>("getActiveSession");
@@ -121,9 +111,6 @@ class SessionAPI {
     }
   }
 
-  /**
-   * Get session statistics
-   */
   async getStats(sessionId?: number): Promise<SessionStatsResponse> {
     try {
       const response = await this.call<SessionStatsResponse>("getSessionStats", { sessionId });
@@ -134,11 +121,7 @@ class SessionAPI {
     }
   }
 
-  // ✏️ WRITE
-
-  /**
-   * Create a new session
-   */
+  // WRITE
   async create(data: SessionCreateData): Promise<SessionResponse> {
     try {
       const response = await this.call<SessionResponse>("createSession", data);
@@ -149,9 +132,6 @@ class SessionAPI {
     }
   }
 
-  /**
-   * Update an existing session
-   */
   async update(id: number, data: SessionUpdateData): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -163,9 +143,6 @@ class SessionAPI {
     }
   }
 
-  /**
-   * Update session status
-   */
   async updateStatus(id: number, status: string): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -177,9 +154,6 @@ class SessionAPI {
     }
   }
 
-  /**
-   * Soft delete a session
-   */
   async delete(id: number): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -191,9 +165,6 @@ class SessionAPI {
     }
   }
 
-  /**
-   * Restore a soft-deleted session
-   */
   async restore(id: number): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");

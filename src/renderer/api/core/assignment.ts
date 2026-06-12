@@ -1,5 +1,6 @@
-// src/renderer/api/assignmentAPI.ts
-// Updated to use common pagination types
+// src/renderer/api/core/assignmentAPI.ts
+// Fixed pagination: backend returns { data: { data: T[], pagination } }
+// Client transforms to { items: T[], pagination }
 
 import type { ApiResponse, BaseFilters, PaginatedResponse } from "../shared";
 import type { Pitak } from "./pitak";
@@ -13,7 +14,7 @@ import type { Worker } from "./worker";
 export interface Assignment {
   id: number;
   luwangCount: number;
-  assignmentDate: string; // ISO date
+  assignmentDate: string;
   status: "initiated" | "active" | "completed" | "cancelled";
   notes?: string | null;
   createdAt: string;
@@ -44,7 +45,7 @@ export interface AssignmentFilters extends BaseFilters {
 }
 
 // ----------------------------------------------------------------------
-// 🧠 AssignmentAPI Class (using common types)
+// 🧠 AssignmentAPI Class
 // ----------------------------------------------------------------------
 
 class AssignmentAPI {
@@ -60,34 +61,42 @@ class AssignmentAPI {
     return window.backendAPI.assignment({ method, params });
   }
 
+  /**
+   * Transform backend nested pagination response to frontend format.
+   * Backend: { data: T[], pagination: {...} }
+   * Frontend: { items: T[], pagination: {...} }
+   */
+  private toPaginatedResponse<T>(backendResult: any): PaginatedResponse<T> {
+    return {
+      items: backendResult?.data || [],
+      pagination: backendResult?.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+    };
+  }
+
   // 🔎 READ (with pagination)
 
-  /**
-   * Get all assignments with optional filters (paginated)
-   */
   async getAll(params?: AssignmentFilters): Promise<AssignmentsResponse> {
     try {
-      const response = await this.call<AssignmentsResponse>(
-        "getAllAssignments",
-        params || {},
-      );
-      if (response.status) return response;
+      const response = await this.call<any>("getAllAssignments", params || {});
+      if (response.status) {
+        // Backend returns response.data = { data: [], pagination: {} }
+        const transformed = this.toPaginatedResponse<Assignment>(response.data);
+        return {
+          status: true,
+          message: response.message,
+          data: transformed,
+        };
+      }
       throw new Error(response.message || "Failed to fetch assignments");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch assignments");
     }
   }
 
-  /**
-   * Get assignment by ID
-   */
   async getById(id: number): Promise<AssignmentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<AssignmentResponse>(
-        "getAssignmentById",
-        { id },
-      );
+      const response = await this.call<AssignmentResponse>("getAssignmentById", { id });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch assignment");
     } catch (error: any) {
@@ -95,9 +104,6 @@ class AssignmentAPI {
     }
   }
 
-  /**
-   * Get assignments by worker ID (paginated)
-   */
   async getByWorker(
     workerId: number,
     params?: Omit<AssignmentFilters, "workerId">,
@@ -105,9 +111,6 @@ class AssignmentAPI {
     return this.getAll({ ...params, workerId });
   }
 
-  /**
-   * Get assignments by pitak ID (paginated)
-   */
   async getByPitak(
     pitakId: number,
     params?: Omit<AssignmentFilters, "pitakId">,
@@ -115,9 +118,6 @@ class AssignmentAPI {
     return this.getAll({ ...params, pitakId });
   }
 
-  /**
-   * Get assignments by session ID (paginated)
-   */
   async getBySession(
     sessionId: number,
     params?: Omit<AssignmentFilters, "sessionId">,
@@ -125,15 +125,9 @@ class AssignmentAPI {
     return this.getAll({ ...params, sessionId });
   }
 
-  /**
-   * Get assignment statistics
-   */
   async getStats(sessionId?: number): Promise<AssignmentStatsResponse> {
     try {
-      const response = await this.call<AssignmentStatsResponse>(
-        "getAssignmentStats",
-        { sessionId },
-      );
+      const response = await this.call<AssignmentStatsResponse>("getAssignmentStats", { sessionId });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
     } catch (error: any) {
@@ -143,9 +137,6 @@ class AssignmentAPI {
 
   // ✏️ WRITE
 
-  /**
-   * Create a new assignment
-   */
   async create(data: {
     workerId: number;
     pitakId: number;
@@ -155,10 +146,7 @@ class AssignmentAPI {
     status?: string;
   }): Promise<AssignmentResponse> {
     try {
-      const response = await this.call<AssignmentResponse>(
-        "createAssignment",
-        data,
-      );
+      const response = await this.call<AssignmentResponse>("createAssignment", data);
       if (response.status) return response;
       throw new Error(response.message || "Failed to create assignment");
     } catch (error: any) {
@@ -166,9 +154,6 @@ class AssignmentAPI {
     }
   }
 
-  /**
-   * Create multiple assignments at once (bulk)
-   */
   async createBulk(data: {
     workerIds: number[];
     pitakId: number;
@@ -177,20 +162,22 @@ class AssignmentAPI {
     notes?: string;
   }): Promise<AssignmentsResponse> {
     try {
-      const response = await this.call<AssignmentsResponse>(
-        "createBulkAssignments",
-        data,
-      );
-      if (response.status) return response;
+      const response = await this.call<any>("createBulkAssignments", data);
+      if (response.status) {
+        // Bulk creation returns the same nested structure as getAll
+        const transformed = this.toPaginatedResponse<Assignment>(response.data);
+        return {
+          status: true,
+          message: response.message,
+          data: transformed,
+        };
+      }
       throw new Error(response.message || "Failed to create assignments");
     } catch (error: any) {
       throw new Error(error.message || "Failed to create assignments");
     }
   }
 
-  /**
-   * Update an existing assignment
-   */
   async update(
     id: number,
     data: Partial<{
@@ -216,9 +203,6 @@ class AssignmentAPI {
     }
   }
 
-  /**
-   * Update assignment status
-   */
   async updateStatus(id: number, status: string): Promise<AssignmentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -233,15 +217,10 @@ class AssignmentAPI {
     }
   }
 
-  /**
-   * Soft delete (cancel) an assignment
-   */
   async delete(id: number): Promise<AssignmentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<AssignmentResponse>("deleteAssignment", {
-        id,
-      });
+      const response = await this.call<AssignmentResponse>("deleteAssignment", { id });
       if (response.status) return response;
       throw new Error(response.message || "Failed to delete assignment");
     } catch (error: any) {
@@ -249,15 +228,10 @@ class AssignmentAPI {
     }
   }
 
-  /**
-   * Restore a soft-deleted assignment
-   */
   async restore(id: number): Promise<AssignmentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<AssignmentResponse>("restoreAssignment", {
-        id,
-      });
+      const response = await this.call<AssignmentResponse>("restoreAssignment", { id });
       if (response.status) return response;
       throw new Error(response.message || "Failed to restore assignment");
     } catch (error: any) {

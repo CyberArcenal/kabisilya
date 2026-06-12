@@ -1,11 +1,7 @@
-// src/renderer/api/notificationAPI.ts
-// Updated to use common pagination types and align with refactored NotificationService
+// src/renderer/api/core/notificationAPI.ts
+// Fixed pagination: backend returns { data, pagination } -> frontend expects { items, pagination }
 
 import type { PaginatedResponse, ApiResponse, BaseFilters } from "../shared";
-
-// ----------------------------------------------------------------------
-// 📦 Types
-// ----------------------------------------------------------------------
 
 export interface Notification {
   id: number;
@@ -34,10 +30,6 @@ export interface NotificationFilters extends BaseFilters {
   endDate?: string;
 }
 
-// ----------------------------------------------------------------------
-// 🧠 NotificationAPI Class
-// ----------------------------------------------------------------------
-
 class NotificationAPI {
   private channel = "notification";
 
@@ -48,12 +40,24 @@ class NotificationAPI {
     return window.backendAPI.notification({ method, params });
   }
 
-  // 🔎 READ
+  private toPaginatedResponse<T>(raw: any): PaginatedResponse<T> {
+    return {
+      items: raw.data || [],
+      pagination: raw.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+    };
+  }
 
+  // READ
   async getAll(params?: NotificationFilters): Promise<NotificationsResponse> {
     try {
-      const response = await this.call<NotificationsResponse>("getAllNotifications", params || {});
-      if (response.status) return response;
+      const response = await this.call<any>("getAllNotifications", params || {});
+      if (response.status) {
+        return {
+          status: true,
+          message: response.message,
+          data: this.toPaginatedResponse<Notification>(response.data),
+        };
+      }
       throw new Error(response.message || "Failed to fetch notifications");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch notifications");
@@ -81,8 +85,7 @@ class NotificationAPI {
     }
   }
 
-  // ✏️ WRITE
-
+  // WRITE
   async delete(id: number): Promise<ActionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -136,7 +139,6 @@ class NotificationAPI {
     }
   }
 
-  // 📊 STATS (utility)
   async getStats(userId?: number): Promise<{ total: number; unread: number; read: number; byType: Record<string, number> }> {
     const all = await this.getAll({ limit: 1000, userId });
     const unreadCount = await this.getUnreadCount(userId);

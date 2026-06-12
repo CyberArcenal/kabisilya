@@ -1,5 +1,5 @@
-// src/renderer/api/paymentAPI.ts
-// Updated to use common pagination types and align with refactored PaymentService
+// src/renderer/api/core/paymentAPI.ts
+// Fixed pagination: backend returns { data, pagination } -> frontend expects { items, pagination }
 
 import type { Assignment } from "./assignment";
 import type { Debt } from "./debt";
@@ -8,10 +8,6 @@ import type { Pitak } from "./pitak";
 import type { Session } from "./session";
 import type { Worker } from "./worker";
 import type { PaginatedResponse, ApiResponse, BaseFilters } from "../shared";
-
-// ----------------------------------------------------------------------
-// 📦 Payment-specific Types
-// ----------------------------------------------------------------------
 
 export interface Payment {
   id: number;
@@ -45,8 +41,8 @@ export interface PaymentCreateData {
   pitakId: number;
   sessionId: number;
   assignmentId?: number | null;
-  amount: number;  // Changed from grossPay to amount for consistency with service
-  grossPay?: number;  // Keep for backward compatibility
+  amount: number;
+  grossPay?: number;
   manualDeduction?: number;
   netPay?: number;
   status?: "pending" | "partially_paid" | "completed" | "cancelled";
@@ -91,10 +87,6 @@ export interface PaymentFilters extends BaseFilters {
   idempotencyKey?: string;
 }
 
-// ----------------------------------------------------------------------
-// 🧠 PaymentAPI Class (using common types)
-// ----------------------------------------------------------------------
-
 class PaymentAPI {
   private channel = "payment";
 
@@ -105,24 +97,29 @@ class PaymentAPI {
     return window.backendAPI.payment({ method, params });
   }
 
-  // 🔎 READ (with pagination)
+  private toPaginatedResponse<T>(raw: any): PaginatedResponse<T> {
+    return {
+      items: raw.data || [],
+      pagination: raw.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+    };
+  }
 
-  /**
-   * Get all payments with optional filters (paginated)
-   */
   async getAll(params?: PaymentFilters): Promise<PaymentsResponse> {
     try {
-      const response = await this.call<PaymentsResponse>("getAllPayments", params || {});
-      if (response.status) return response;
+      const response = await this.call<any>("getAllPayments", params || {});
+      if (response.status) {
+        return {
+          status: true,
+          message: response.message,
+          data: this.toPaginatedResponse<Payment>(response.data),
+        };
+      }
       throw new Error(response.message || "Failed to fetch payments");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch payments");
     }
   }
 
-  /**
-   * Get payment by ID
-   */
   async getById(id: number): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -134,39 +131,18 @@ class PaymentAPI {
     }
   }
 
-  /**
-   * Get payments by worker ID (paginated)
-   */
-  async getByWorker(
-    workerId: number,
-    params?: Omit<PaymentFilters, "workerId">
-  ): Promise<PaymentsResponse> {
+  async getByWorker(workerId: number, params?: Omit<PaymentFilters, "workerId">): Promise<PaymentsResponse> {
     return this.getAll({ ...params, workerId });
   }
 
-  /**
-   * Get payments by pitak ID (paginated)
-   */
-  async getByPitak(
-    pitakId: number,
-    params?: Omit<PaymentFilters, "pitakId">
-  ): Promise<PaymentsResponse> {
+  async getByPitak(pitakId: number, params?: Omit<PaymentFilters, "pitakId">): Promise<PaymentsResponse> {
     return this.getAll({ ...params, pitakId });
   }
 
-  /**
-   * Get payments by session ID (paginated)
-   */
-  async getBySession(
-    sessionId: number,
-    params?: Omit<PaymentFilters, "sessionId">
-  ): Promise<PaymentsResponse> {
+  async getBySession(sessionId: number, params?: Omit<PaymentFilters, "sessionId">): Promise<PaymentsResponse> {
     return this.getAll({ ...params, sessionId });
   }
 
-  /**
-   * Get payment statistics
-   */
   async getStats(sessionId?: number): Promise<PaymentStatsResponse> {
     try {
       const response = await this.call<PaymentStatsResponse>("getPaymentStats", { sessionId });
@@ -177,14 +153,8 @@ class PaymentAPI {
     }
   }
 
-  // ✏️ WRITE
-
-  /**
-   * Create a new payment
-   */
   async create(data: PaymentCreateData): Promise<PaymentResponse> {
     try {
-      // Transform grossPay/netPay to amount if needed (service expects amount)
       const payload = { ...data };
       if (data.amount === undefined && data.grossPay !== undefined) {
         payload.amount = data.grossPay;
@@ -197,9 +167,6 @@ class PaymentAPI {
     }
   }
 
-  /**
-   * Update an existing payment
-   */
   async update(id: number, data: PaymentUpdateData): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -211,9 +178,6 @@ class PaymentAPI {
     }
   }
 
-  /**
-   * Update payment status
-   */
   async updateStatus(id: number, status: string): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -225,9 +189,6 @@ class PaymentAPI {
     }
   }
 
-  /**
-   * Soft delete a payment
-   */
   async delete(id: number): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -239,9 +200,6 @@ class PaymentAPI {
     }
   }
 
-  /**
-   * Restore a soft-deleted payment
-   */
   async restore(id: number): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");

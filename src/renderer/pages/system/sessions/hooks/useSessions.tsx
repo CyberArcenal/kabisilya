@@ -1,5 +1,5 @@
 // src/renderer/pages/system/sessions/hooks/useSessions.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useModal } from "../../../../hooks/useModal";
 import { dialogs } from "../../../../utils/dialogs";
 import type { SessionWithDetails, SessionFormData } from "../types";
@@ -9,11 +9,13 @@ import paymentAPI from "../../../../api/core/payment";
 import assignmentAPI from "../../../../api/core/assignment";
 import debtAPI from "../../../../api/core/debt";
 
+// Constant page size (hindi na kailangan as state)
+const PAGE_SIZE = 10;
+
 export const useSessions = () => {
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -27,25 +29,59 @@ export const useSessions = () => {
   const viewModal = useModal();
   const formModal = useModal();
 
+  // Ref para i-track kung naka-mount pa ang component
+  const isMountedRef = useRef(true);
+  // Ref para ma-cancel ang previous request
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      // Cancel ongoing request kapag nag-unmount
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   const fetchSessions = useCallback(async () => {
+    // Cancel previous request kung mayroon
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    if (!isMountedRef.current) return;
+
     setLoading(true);
     try {
-      const params: any = { page, pageSize, sortBy: "startDate", sortOrder: "DESC" };
+      const params: any = {
+        page,
+        limit: PAGE_SIZE,
+        sortBy: "startDate",
+        sortOrder: "DESC",
+      };
       if (search) params.search = search;
       if (status) params.status = status;
 
       const res = await sessionAPI.getAll(params);
+      // Kung na-abort na, huwag nang i-update ang state
+      if (controller.signal.aborted) return;
+      if (!isMountedRef.current) return;
+
       if (!res.status) throw new Error(res.message || "Failed to fetch sessions");
       setSessions(res.data.items);
       setTotalCount(res.data.pagination.total);
       setTotalPages(res.data.pagination.pages);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") return;
       console.error("Failed to fetch sessions", error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [page, pageSize, search, status]);
+  }, [page, search, status]); // PAGE_SIZE ay constant, hindi kailangan sa dependencies
 
+  // Fetch tuwing magbago ang page, search, o status
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
@@ -75,7 +111,6 @@ export const useSessions = () => {
   };
 
   const handleView = async (session: SessionWithDetails) => {
-    // Fetch stats
     try {
       const [bukidsRes, assignmentsRes, paymentsRes, debtsRes] = await Promise.all([
         bukidAPI.getAll({ sessionId: session.id, limit: 1 }),

@@ -42,7 +42,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  if (workers?.length??0 === 0) {
+  if (workers?.length === 0) {
     return (
       <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">
         No workers found

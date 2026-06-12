@@ -15,7 +15,7 @@ const WorkerSelect: React.FC<WorkerSelectProps> = (props) => {
   const fetchWorkers = async (search: string): Promise<Option[]> => {
     const res = await workerAPI.getAll({ search, limit: 100, sortBy: "name", sortOrder: "ASC" });
     if (!res.status) return [];
-    return res.data.items.map((w) => ({
+    return res.data.items?.map((w) => ({
       id: w.id,
       label: w.name,
       subLabel: w.email || w.contact || undefined,

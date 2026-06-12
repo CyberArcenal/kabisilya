@@ -1,4 +1,4 @@
-// src/renderer/api/control.ts
+// src/renderer/api/utils/control.ts
 
 export interface WindowBounds {
   x: number;

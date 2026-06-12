@@ -1,4 +1,4 @@
-// src/renderer/api/core/themes.ts
+// src/renderer/api/core/core/themes.ts
 
 import type { ApiResponse } from "../shared";
 

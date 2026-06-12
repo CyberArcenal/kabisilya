@@ -33,74 +33,61 @@ const Modal: React.FC<ModalProps> = ({
   blur = false,
   safetyClose = false,
 }) => {
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
-  const [shouldRender, setShouldRender] = useState(false);
+  const [animationState, setAnimationState] = useState<"closed" | "opening" | "open" | "closing">("closed");
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const animationTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const handleClose = useCallback(async () => {
-    if (safetyClose) {
-      const confirmed = await dialogs.confirm({
-        title: "Close",
-        message: "Are you sure you want to close this dialog?",
-      });
-      if (!confirmed) return;
-    }
-    setIsAnimatingOut(true);
-    setTimeout(() => {
-      setShouldRender(false);
-      setIsAnimatingOut(false);
-      onClose();
-    }, 200);
-  }, [safetyClose, onClose]);
-
-  // ✅ Kapag nagbago ang isOpen mula sa labas (e.g., parent set to false)
+  // Cleanup timeouts on unmount
   useEffect(() => {
-    if (!isOpen && shouldRender) {
-      // Pwersahang i-reset ang modal nang walang animation
-      setShouldRender(false);
-      setIsAnimatingOut(false);
-    }
-  }, [isOpen, shouldRender]);
-
-  // ESC key
-  useEffect(() => {
-    if (!isOpen || !closeOnEsc) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, closeOnEsc, handleClose]);
-
-  // Body scroll lock
-  useEffect(() => {
-    if (!preventScroll) return;
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
     return () => {
-      document.body.style.overflow = "";
+      if (animationTimeout.current) clearTimeout(animationTimeout.current);
     };
-  }, [isOpen, preventScroll]);
+  }, []);
 
+  // Handle opening/closing based on isOpen prop
   useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true);
+    if (isOpen && animationState === "closed") {
+      // Start opening
+      setAnimationState("opening");
+      // Store previously focused element
       previousActiveElement.current = document.activeElement as HTMLElement;
+      // Prevent body scroll if needed
+      if (preventScroll) document.body.style.overflow = "hidden";
+      // After a short delay, set to open (for CSS transition)
+      animationTimeout.current = setTimeout(() => {
+        setAnimationState("open");
+        // Focus trap setup will happen in next effect
+      }, 20);
+    } else if (!isOpen && (animationState === "open" || animationState === "opening")) {
+      // Start closing
+      setAnimationState("closing");
+      if (animationTimeout.current) clearTimeout(animationTimeout.current);
+      // Wait for CSS transition then close
+      animationTimeout.current = setTimeout(() => {
+        setAnimationState("closed");
+        // Restore body scroll
+        if (preventScroll) document.body.style.overflow = "";
+        // Restore focus
+        if (previousActiveElement.current) {
+          previousActiveElement.current.focus();
+          previousActiveElement.current = null;
+        }
+        // Call onClose to let parent know it's fully closed (optional)
+        // but parent already knows isOpen=false, so we avoid double call
+      }, 200);
     }
-  }, [isOpen]);
+  }, [isOpen, animationState, preventScroll]);
 
-  // Focus trap
+  // Focus trap when modal is open
   useEffect(() => {
-    if (!shouldRender || isAnimatingOut) return;
+    if (animationState !== "open") return;
+
     const focusableElements = modalRef.current?.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    const firstElement = focusableElements?.[0] as HTMLElement;
-    const lastElement = focusableElements?.[focusableElements.length - 1] as HTMLElement;
+    ) as NodeListOf<HTMLElement>;
+    const firstElement = focusableElements?.[0];
+    const lastElement = focusableElements?.[focusableElements.length - 1];
 
     const handleTab = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
@@ -121,6 +108,7 @@ const Modal: React.FC<ModalProps> = ({
       }
     };
 
+    // Set initial focus to modal container or first focusable element
     if (modalRef.current && !modalRef.current.contains(document.activeElement)) {
       if (firstElement) {
         firstElement.focus();
@@ -131,17 +119,34 @@ const Modal: React.FC<ModalProps> = ({
 
     document.addEventListener("keydown", handleTab);
     return () => document.removeEventListener("keydown", handleTab);
-  }, [shouldRender, isAnimatingOut]);
+  }, [animationState]);
 
-  // Restore focus
+  // ESC key handler
   useEffect(() => {
-    if (!shouldRender && previousActiveElement.current) {
-      previousActiveElement.current.focus();
-      previousActiveElement.current = null;
-    }
-  }, [shouldRender]);
+    if (!closeOnEsc || animationState !== "open") return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [animationState, closeOnEsc]);
 
-  if (!shouldRender) return null;
+  const handleClose = useCallback(async () => {
+    if (safetyClose) {
+      const confirmed = await dialogs.confirm({
+        title: "Close",
+        message: "Are you sure you want to close this dialog?",
+      });
+      if (!confirmed) return;
+    }
+    onClose();
+  }, [safetyClose, onClose]);
+
+  const handleBackdropClick = () => {
+    if (closeOnClickOutside) handleClose();
+  };
+
+  if (animationState === "closed") return null;
 
   const sizeClasses = {
     sm: "max-w-md",
@@ -151,6 +156,20 @@ const Modal: React.FC<ModalProps> = ({
     full: "max-w-full mx-4",
   };
 
+  const backdropClasses = `fixed inset-0 transition-all duration-200 ${
+    blur ? "backdrop-blur-sm" : "bg-black/50"
+  } ${
+    animationState === "opening" ? "opacity-0" : animationState === "closing" ? "opacity-0" : "opacity-100"
+  }`;
+
+  const modalClasses = `relative w-full ${sizeClasses[size]} ${minHeight} transform rounded-xl bg-[var(--card-bg)] shadow-2xl transition-all duration-200 ${
+    animationState === "opening"
+      ? "scale-95 opacity-0"
+      : animationState === "closing"
+      ? "scale-95 opacity-0"
+      : "scale-100 opacity-100"
+  }`;
+
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto"
@@ -159,21 +178,14 @@ const Modal: React.FC<ModalProps> = ({
       role="dialog"
     >
       {/* Backdrop */}
-      <div
-        className={`fixed inset-0 transition-all duration-200 ${
-          blur ? "backdrop-blur-sm" : "bg-black/50"
-        } ${isAnimatingOut ? "opacity-0" : "opacity-100"}`}
-        onClick={closeOnClickOutside ? handleClose : undefined}
-      />
+      <div className={backdropClasses} onClick={handleBackdropClick} />
 
       {/* Modal container */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={modalRef}
           tabIndex={-1}
-          className={`relative w-full ${sizeClasses[size]} ${minHeight} transform rounded-xl bg-[var(--card-bg)] shadow-2xl transition-all duration-200 ${
-            isAnimatingOut ? "scale-95 opacity-0" : "scale-100 opacity-100"
-          }`}
+          className={modalClasses}
         >
           {/* Header */}
           {(title || showCloseButton) && (

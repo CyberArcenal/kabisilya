@@ -42,22 +42,60 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Load initial options
+  // Refs to prevent infinite loops
+  const initialLoadedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const fetchOptionsRef = useRef(fetchOptions);
+
+  // Load initial options – runs only once on mount, or when fetchOptions reference changes
   useEffect(() => {
+    // Skip if already loaded and fetchOptions hasn't changed
+    if (initialLoadedRef.current && fetchOptionsRef.current === fetchOptions) {
+      return;
+    }
+
+    // Update stored fetchOptions reference
+    fetchOptionsRef.current = fetchOptions;
+
     const load = async () => {
+      // Cancel previous request
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       setLoading(true);
       try {
         const opts = await fetchOptions("");
+        // Check if this request is still valid
+        if (controller.signal.aborted) return;
         setOptions(opts);
         setFiltered(opts);
-      } catch (error) {
+        initialLoadedRef.current = true;
+      } catch (error: any) {
+        if (error.name === "AbortError") return;
         console.error("Failed to load options", error);
       } finally {
         setLoading(false);
       }
     };
-    if (initialOptions.length === 0) load();
-  }, [fetchOptions, initialOptions]);
+
+    // Only load if we don't have initialOptions provided, or if we need to refresh
+    if (initialOptions.length === 0 || !initialLoadedRef.current) {
+      load();
+    } else {
+      // If initialOptions were provided, use them and mark as loaded
+      setOptions(initialOptions);
+      setFiltered(initialOptions);
+      initialLoadedRef.current = true;
+    }
+  }, [fetchOptions, initialOptions]); // Still depends, but guarded by refs
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   // Filter on search term
   useEffect(() => {

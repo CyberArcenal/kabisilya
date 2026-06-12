@@ -1,14 +1,10 @@
-// src/renderer/api/pitakAPI.ts
-// Updated to use common pagination types and align with refactored PitakService
+// src/renderer/api/core/pitakAPI.ts
+// Fixed pagination: backend returns { data: Pitak[], pagination } at top level
 
 import type { Assignment } from "./assignment";
 import type { Bukid } from "./bukid";
 import type { Payment } from "./payment";
 import type { PaginatedResponse, ApiResponse, BaseFilters } from "../shared";
-
-// ----------------------------------------------------------------------
-// 📦 Pitak-specific Types
-// ----------------------------------------------------------------------
 
 export interface Pitak {
   id: number;
@@ -17,7 +13,7 @@ export interface Pitak {
   layoutType?: string;
   sideLengths?: any | null;
   areaSqm?: number;
-  area?: number;          // alias for areaSqm
+  area?: number;
   notes?: string | null;
   description?: string | null;
   status: "active" | "completed" | "cancelled";
@@ -35,7 +31,7 @@ export interface PitakCreateData {
   layoutType?: string;
   sideLengths?: any;
   areaSqm?: number;
-  area?: number;          // alias
+  area?: number;
   notes?: string;
   description?: string;
   status?: "active" | "completed" | "cancelled";
@@ -63,10 +59,6 @@ export interface PitakFilters extends BaseFilters {
   maxArea?: number;
 }
 
-// ----------------------------------------------------------------------
-// 🧠 PitakAPI Class (using common types)
-// ----------------------------------------------------------------------
-
 class PitakAPI {
   private channel = "pitak";
 
@@ -77,24 +69,25 @@ class PitakAPI {
     return window.backendAPI.pitak({ method, params });
   }
 
-  // 🔎 READ (with pagination)
-
-  /**
-   * Get all pitaks with optional filters (paginated)
-   */
   async getAll(params?: PitakFilters): Promise<PitaksResponse> {
     try {
-      const response = await this.call<PitaksResponse>("getAllPitaks", params || {});
-      if (response.status) return response;
+      const response = await this.call<any>("getAllPitaks", params || {});
+      if (response.status) {
+        return {
+          status: true,
+          message: response.message,
+          data: {
+            items: response.data,           // array of pitaks
+            pagination: response.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+          },
+        };
+      }
       throw new Error(response.message || "Failed to fetch pitaks");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch pitaks");
     }
   }
 
-  /**
-   * Get pitak by ID
-   */
   async getById(id: number): Promise<PitakResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -106,19 +99,10 @@ class PitakAPI {
     }
   }
 
-  /**
-   * Get pitaks by bukid ID (paginated)
-   */
-  async getByBukid(
-    bukidId: number,
-    params?: Omit<PitakFilters, "bukidId">
-  ): Promise<PitaksResponse> {
+  async getByBukid(bukidId: number, params?: Omit<PitakFilters, "bukidId">): Promise<PitaksResponse> {
     return this.getAll({ ...params, bukidId });
   }
 
-  /**
-   * Get pitak statistics
-   */
   async getStats(bukidId?: number): Promise<PitakStatsResponse> {
     try {
       const response = await this.call<PitakStatsResponse>("getPitakStats", { bukidId });
@@ -129,14 +113,8 @@ class PitakAPI {
     }
   }
 
-  // ✏️ WRITE
-
-  /**
-   * Create a new pitak
-   */
   async create(data: PitakCreateData): Promise<PitakResponse> {
     try {
-      // Convert area to areaSqm if needed
       const payload = { ...data };
       if (payload.area !== undefined && payload.areaSqm === undefined) {
         payload.areaSqm = payload.area;
@@ -150,9 +128,6 @@ class PitakAPI {
     }
   }
 
-  /**
-   * Update an existing pitak
-   */
   async update(id: number, data: PitakUpdateData): Promise<PitakResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -169,13 +144,7 @@ class PitakAPI {
     }
   }
 
-  /**
-   * Update pitak status
-   */
-  async updateStatus(
-    id: number,
-    status: "active" | "completed" | "cancelled"
-  ): Promise<PitakResponse> {
+  async updateStatus(id: number, status: "active" | "completed" | "cancelled"): Promise<PitakResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
       const response = await this.call<PitakResponse>("updateStatus", { id, status });
@@ -186,9 +155,6 @@ class PitakAPI {
     }
   }
 
-  /**
-   * Soft delete a pitak
-   */
   async delete(id: number): Promise<PitakResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -200,9 +166,6 @@ class PitakAPI {
     }
   }
 
-  /**
-   * Restore a soft-deleted pitak
-   */
   async restore(id: number): Promise<PitakResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");

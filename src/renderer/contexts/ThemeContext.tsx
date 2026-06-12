@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+// src/contexts/ThemeContext.tsx
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { themesAPI } from '../api/core/themes';
-
 
 interface ThemeContextType {
   theme: 'light' | 'dark';
@@ -16,85 +16,64 @@ export const useTheme = () => {
   return context;
 };
 
-// Light theme CSS variables (override dark defaults)
-const lightThemeVars = {
-  '--background-color': '#ffffff',
-  '--sidebar-bg': '#f7f7f9',
-  '--sidebar-border': '#e0e0e6',
-  '--sidebar-text': '#0e0e10',
-  '--card-bg': '#ffffff',
-  '--card-secondary-bg': '#f2f2f5',
-  '--card-hover-bg': '#e8e8ec',
-  '--card-border': '#e2e2e2',
-  '--border-color': '#e0e0e6',
-  '--border-light': '#e8e8ec',
-  '--text-primary': '#0e0e10',
-  '--text-secondary': '#53535f',
-  '--text-tertiary': '#7a7a8c',
-  '--input-bg': '#f2f2f5',
-  '--input-border': '#e0e0e6',
-  '--btn-secondary-bg': '#e8e8ec',
-  '--btn-secondary-hover': '#d9d9e0',
-  '--btn-secondary-text': '#0e0e10',
-  '--status-success-bg': 'rgba(0, 181, 184, 0.1)',
-  '--status-inactive-bg': 'rgba(90, 90, 112, 0.1)',
-};
-
-const darkThemeVars = {
-  '--background-color': '#0e0e10',
-  '--sidebar-bg': '#1f1f2b',
-  '--sidebar-border': '#2d2d3a',
-  '--sidebar-text': '#efeff1',
-  '--card-bg': '#1f1f23',
-  '--card-border': '#2a2a2e',
-  '--card-secondary-bg': '#18181b',
-  '--card-hover-bg': '#2a2a35',
-  '--border-color': '#2d2d3a',
-  '--border-light': '#3a3a4a',
-  '--text-primary': '#efeff1',
-  '--text-secondary': '#adadb8',
-  '--text-tertiary': '#7a7a8c',
-  '--input-bg': '#2d2d3a',
-  '--input-border': '#3a3a4a',
-  '--btn-secondary-bg': '#2d2d3a',
-  '--btn-secondary-hover': '#3a3a4a',
-  '--btn-secondary-text': '#efeff1',
-  '--status-success-bg': 'rgba(0, 181, 184, 0.15)',
-  '--status-inactive-bg': 'rgba(90, 90, 112, 0.15)',
-};
-
+// Apply theme by setting data-theme attribute on document root
 const applyTheme = (theme: 'light' | 'dark') => {
-  const vars = theme === 'light' ? lightThemeVars : darkThemeVars;
   const root = document.documentElement;
-  Object.entries(vars).forEach(([key, value]) => {
-    root.style.setProperty(key, value);
-  });
+  if (theme === 'dark') {
+    root.setAttribute('data-theme', 'dark');
+  } else {
+    root.removeAttribute('data-theme'); // or set to 'light' if you prefer
+    // Optionally: root.setAttribute('data-theme', 'light');
+  }
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<'light' | 'dark'>('dark');
+  const [theme, setThemeState] = useState<'light' | 'dark'>('light');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadTheme = async () => {
+  const loadTheme = useCallback(async () => {
     try {
       const res = await themesAPI.getCurrent();
       if (res.status && res.data) {
-        setThemeState(res.data);
-        applyTheme(res.data);
+        const loadedTheme = res.data;
+        setThemeState(loadedTheme);
+        applyTheme(loadedTheme);
+      } else {
+        // Fallback to system preference or light
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const defaultTheme = prefersDark ? 'dark' : 'light';
+        setThemeState(defaultTheme);
+        applyTheme(defaultTheme);
       }
     } catch (err) {
       console.error('Failed to load theme', err);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadTheme();
+
     // Listen for theme changes from other windows (e.g., settings changed)
     const unsubscribe = window.backendAPI?.on?.('theme:changed', (data: { theme: 'light' | 'dark' }) => {
       setThemeState(data.theme);
       applyTheme(data.theme);
     });
-    return () => unsubscribe?.();
-  }, []);
+
+    // Optional: listen for system preference changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemChange = (e: MediaQueryListEvent) => {
+      // Only auto-switch if no explicit user theme is stored? Decide based on your logic.
+      // For simplicity, we can ignore or implement a "follow system" setting later.
+    };
+    mediaQuery.addEventListener('change', handleSystemChange);
+
+    return () => {
+      unsubscribe?.();
+      mediaQuery.removeEventListener('change', handleSystemChange);
+    };
+  }, [loadTheme]);
 
   const setTheme = async (newTheme: 'light' | 'dark') => {
     try {
@@ -110,6 +89,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     await setTheme(newTheme);
   };
+
+  if (isLoading) {
+    // Optional: render a minimal loading state or null to avoid flash
+    return null;
+  }
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>

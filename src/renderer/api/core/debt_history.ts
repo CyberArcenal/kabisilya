@@ -1,5 +1,5 @@
-// src/renderer/api/debtHistoryAPI.ts
-// Updated to use common pagination types and align with refactored DebtHistoryService
+// src/renderer/api/core/debtHistoryAPI.ts
+// Fixed pagination: backend returns { data, pagination } -> frontend expects { items, pagination }
 
 import type { Debt } from "./debt";
 import type { Payment } from "./payment";
@@ -63,7 +63,7 @@ export interface DebtHistoryFilters extends BaseFilters {
 }
 
 // ----------------------------------------------------------------------
-// 🧠 DebtHistoryAPI Class (using common types)
+// 🧠 DebtHistoryAPI Class (with pagination transformation)
 // ----------------------------------------------------------------------
 
 class DebtHistoryAPI {
@@ -79,34 +79,35 @@ class DebtHistoryAPI {
     return window.backendAPI.debtHistory({ method, params });
   }
 
-  // 🔎 READ (with pagination)
+  private toPaginatedResponse<T>(raw: any): PaginatedResponse<T> {
+    return {
+      items: raw.data || [],
+      pagination: raw.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+    };
+  }
 
-  /**
-   * Get all debt history entries with optional filters (paginated)
-   */
+  // 🔎 READ
+
   async getAll(params?: DebtHistoryFilters): Promise<DebtHistoriesResponse> {
     try {
-      const response = await this.call<DebtHistoriesResponse>(
-        "getAllDebtHistories",
-        params || {},
-      );
-      if (response.status) return response;
+      const response = await this.call<any>("getAllDebtHistories", params || {});
+      if (response.status) {
+        return {
+          status: true,
+          message: response.message,
+          data: this.toPaginatedResponse<DebtHistory>(response.data),
+        };
+      }
       throw new Error(response.message || "Failed to fetch debt histories");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch debt histories");
     }
   }
 
-  /**
-   * Get debt history by ID
-   */
   async getById(id: number): Promise<DebtHistoryResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<DebtHistoryResponse>(
-        "getDebtHistoryById",
-        { id },
-      );
+      const response = await this.call<DebtHistoryResponse>("getDebtHistoryById", { id });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch debt history");
     } catch (error: any) {
@@ -114,9 +115,6 @@ class DebtHistoryAPI {
     }
   }
 
-  /**
-   * Get debt history entries by debt ID (paginated)
-   */
   async getByDebt(
     debtId: number,
     params?: Omit<DebtHistoryFilters, "debtId">,
@@ -124,15 +122,9 @@ class DebtHistoryAPI {
     return this.getAll({ ...params, debtId });
   }
 
-  /**
-   * Get debt history statistics
-   */
   async getStats(debtId?: number): Promise<DebtHistoryStatsResponse> {
     try {
-      const response = await this.call<DebtHistoryStatsResponse>(
-        "getDebtHistoryStats",
-        { debtId },
-      );
+      const response = await this.call<DebtHistoryStatsResponse>("getDebtHistoryStats", { debtId });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
     } catch (error: any) {
@@ -142,15 +134,9 @@ class DebtHistoryAPI {
 
   // ✏️ WRITE
 
-  /**
-   * Create a new debt history entry
-   */
   async create(data: DebtHistoryCreateData): Promise<DebtHistoryResponse> {
     try {
-      const response = await this.call<DebtHistoryResponse>(
-        "createDebtHistory",
-        data,
-      );
+      const response = await this.call<DebtHistoryResponse>("createDebtHistory", data);
       if (response.status) return response;
       throw new Error(response.message || "Failed to create debt history");
     } catch (error: any) {
@@ -158,19 +144,10 @@ class DebtHistoryAPI {
     }
   }
 
-  /**
-   * Update a debt history entry (use with caution)
-   */
-  async update(
-    id: number,
-    data: DebtHistoryUpdateData,
-  ): Promise<DebtHistoryResponse> {
+  async update(id: number, data: DebtHistoryUpdateData): Promise<DebtHistoryResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<DebtHistoryResponse>(
-        "updateDebtHistory",
-        { id, ...data },
-      );
+      const response = await this.call<DebtHistoryResponse>("updateDebtHistory", { id, ...data });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update debt history");
     } catch (error: any) {
@@ -178,16 +155,10 @@ class DebtHistoryAPI {
     }
   }
 
-  /**
-   * Soft delete a debt history entry
-   */
   async delete(id: number): Promise<DebtHistoryResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<DebtHistoryResponse>(
-        "deleteDebtHistory",
-        { id },
-      );
+      const response = await this.call<DebtHistoryResponse>("deleteDebtHistory", { id });
       if (response.status) return response;
       throw new Error(response.message || "Failed to delete debt history");
     } catch (error: any) {
@@ -195,16 +166,10 @@ class DebtHistoryAPI {
     }
   }
 
-  /**
-   * Restore a soft-deleted debt history entry
-   */
   async restore(id: number): Promise<DebtHistoryResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<DebtHistoryResponse>(
-        "restoreDebtHistory",
-        { id },
-      );
+      const response = await this.call<DebtHistoryResponse>("restoreDebtHistory", { id });
       if (response.status) return response;
       throw new Error(response.message || "Failed to restore debt history");
     } catch (error: any) {

@@ -1,15 +1,16 @@
 // src/renderer/pages/farms/assignments/hooks/useAssignments.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useModal } from "../../../../hooks/useModal";
 import { dialogs } from "../../../../utils/dialogs";
 import type { AssignmentWithDetails, AssignmentFormData } from "../types";
 import assignmentAPI from "../../../../api/core/assignment";
 
+const PAGE_SIZE = 10; // constant
+
 export const useAssignments = () => {
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -31,12 +32,30 @@ export const useAssignments = () => {
   const formModal = useModal();
   const bulkModal = useModal();
 
+  // Refs for abort control
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   const fetchAssignments = useCallback(async () => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    if (!isMountedRef.current) return;
     setLoading(true);
+
     try {
       const params: any = {
         page,
-        pageSize,
+        limit: PAGE_SIZE,        // ✅ changed from pageSize to limit
         sortBy: "assignmentDate",
         sortOrder: "DESC",
       };
@@ -49,17 +68,21 @@ export const useAssignments = () => {
       if (endDate) params.endDate = endDate;
 
       const res = await assignmentAPI.getAll(params);
+      if (controller.signal.aborted || !isMountedRef.current) return;
       if (!res.status) throw new Error(res.message || "Failed to fetch assignments");
 
       setAssignments(res.data.items);
       setTotalCount(res.data.pagination.total);
       setTotalPages(res.data.pagination.pages);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") return;
       console.error("Failed to fetch assignments", error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [page, pageSize, search, workerId, pitakId, sessionId, status, startDate, endDate]);
+  }, [page, search, workerId, pitakId, sessionId, status, startDate, endDate]);
 
   useEffect(() => {
     fetchAssignments();
@@ -91,7 +114,7 @@ export const useAssignments = () => {
       workerId: assignment.worker?.id || 0,
       pitakId: assignment.pitak?.id || 0,
       sessionId: assignment.session?.id || 0,
-      assignmentDate: assignment.assignmentDate.split("T")[0], // YYYY-MM-DD
+      assignmentDate: assignment.assignmentDate.split("T")[0],
       notes: assignment.notes || "",
       status: assignment.status,
     });

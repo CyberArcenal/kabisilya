@@ -1,7 +1,4 @@
 // src/renderer/api/utils/workerPaymentAPI.ts
-// @ts-check
-// src/renderer/api/workerPaymentAPI.ts
-// @ts-check
 import type { Debt } from "../core/debt";
 import type { DebtHistory } from "../core/debt_history";
 import type { Payment } from "../core/payment";

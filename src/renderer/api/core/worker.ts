@@ -1,14 +1,10 @@
-// src/renderer/api/workerAPI.ts
-// Updated to use common pagination types and align with refactored WorkerService
+// src/renderer/api/core/workerAPI.ts
+// Fixed pagination: backend returns { data: Worker[], pagination } at top level
 
 import type { Assignment } from "./assignment";
 import type { Debt } from "./debt";
 import type { Payment } from "./payment";
 import type { PaginatedResponse, ApiResponse, BaseFilters } from "../shared";
-
-// ----------------------------------------------------------------------
-// 📦 Worker-specific Types
-// ----------------------------------------------------------------------
 
 export interface Worker {
   id: number;
@@ -59,10 +55,6 @@ export interface WorkerFilters extends BaseFilters {
   contact?: string;
 }
 
-// ----------------------------------------------------------------------
-// 🧠 WorkerAPI Class (using common types)
-// ----------------------------------------------------------------------
-
 class WorkerAPI {
   private channel = "worker";
 
@@ -73,24 +65,26 @@ class WorkerAPI {
     return window.backendAPI.worker({ method, params });
   }
 
-  // 🔎 READ (with pagination)
-
-  /**
-   * Get all workers with optional filters (paginated)
-   */
+  // READ (with pagination)
   async getAll(params?: WorkerFilters): Promise<WorkersResponse> {
     try {
-      const response = await this.call<WorkersResponse>("getAllWorkers", params || {});
-      if (response.status) return response;
+      const response = await this.call<any>("getAllWorkers", params || {});
+      if (response.status) {
+        return {
+          status: true,
+          message: response.message,
+          data: {
+            items: response.data,           // array of workers
+            pagination: response.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+          },
+        };
+      }
       throw new Error(response.message || "Failed to fetch workers");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch workers");
     }
   }
 
-  /**
-   * Get worker by ID
-   */
   async getById(id: number): Promise<WorkerResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -102,19 +96,10 @@ class WorkerAPI {
     }
   }
 
-  /**
-   * Get workers by status (paginated)
-   */
-  async getByStatus(
-    status: string,
-    params?: Omit<WorkerFilters, "status">
-  ): Promise<WorkersResponse> {
+  async getByStatus(status: string, params?: Omit<WorkerFilters, "status">): Promise<WorkersResponse> {
     return this.getAll({ ...params, status });
   }
 
-  /**
-   * Get worker statistics
-   */
   async getStats(workerId?: number): Promise<WorkerStatsResponse> {
     try {
       const response = await this.call<WorkerStatsResponse>("getWorkerStats", { workerId });
@@ -125,11 +110,7 @@ class WorkerAPI {
     }
   }
 
-  // ✏️ WRITE
-
-  /**
-   * Create a new worker
-   */
+  // WRITE
   async create(data: WorkerCreateData): Promise<WorkerResponse> {
     try {
       const response = await this.call<WorkerResponse>("createWorker", data);
@@ -140,9 +121,6 @@ class WorkerAPI {
     }
   }
 
-  /**
-   * Update an existing worker
-   */
   async update(id: number, data: WorkerUpdateData): Promise<WorkerResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -154,9 +132,6 @@ class WorkerAPI {
     }
   }
 
-  /**
-   * Update worker status
-   */
   async updateStatus(id: number, status: string): Promise<WorkerResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -168,9 +143,6 @@ class WorkerAPI {
     }
   }
 
-  /**
-   * Soft delete a worker
-   */
   async delete(id: number): Promise<WorkerResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -182,9 +154,6 @@ class WorkerAPI {
     }
   }
 
-  /**
-   * Restore a soft-deleted worker
-   */
   async restore(id: number): Promise<WorkerResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");

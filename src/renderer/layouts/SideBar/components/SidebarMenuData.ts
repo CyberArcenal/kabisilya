@@ -87,17 +87,17 @@ export const menuItems: MenuItem[] = [
     category: "analytics",
     children: [
       { path: "/analytics/bukid", name: "Bukid Reports", icon: PieChart },
-      { path: "/analytics/pitak", name: "Pitak Productivity", icon: Wheat },
-      {
-        path: "/analytics/finance",
-        name: "Financial Reports",
-        icon: LineChart,
-      },
-      {
-        path: "/analytics/workers",
-        name: "Worker Performance",
-        icon: UserCheck,
-      },
+      // { path: "/analytics/pitak", name: "Pitak Productivity", icon: Wheat },
+      // {
+      //   path: "/analytics/finance",
+      //   name: "Financial Reports",
+      //   icon: LineChart,
+      // },
+      // {
+      //   path: "/analytics/workers",
+      //   name: "Worker Performance",
+      //   icon: UserCheck,
+      // },
     ],
   },
   {

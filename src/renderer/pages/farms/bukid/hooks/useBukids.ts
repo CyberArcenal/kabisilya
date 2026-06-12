@@ -1,5 +1,5 @@
 // src/renderer/pages/farms/bukid/hooks/useBukids.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useModal } from '../../../../hooks/useModal';
 import { dialogs } from '../../../../utils/dialogs';
 import bukidAPI, { type Bukid } from '../../../../api/core/bukid';
@@ -9,11 +9,12 @@ export interface BukidWithPitaks extends Bukid {
   pitaks?: Pitak[];
 }
 
+const PAGE_SIZE = 10; // constant – hindi na state para iwas dependency
+
 export const useBukids = () => {
   const [bukids, setBukids] = useState<BukidWithPitaks[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -29,12 +30,31 @@ export const useBukids = () => {
   const viewModal = useModal();
   const formModal = useModal();
 
+  // Refs para maiwasan ang race conditions at unmounted updates
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   const fetchBukids = useCallback(async () => {
+    // Cancel previous request
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    if (!isMountedRef.current) return;
     setLoading(true);
+
     try {
       const params: any = {
         page,
-        pageSize,
+        limit: PAGE_SIZE,
         sortBy: 'createdAt',
         sortOrder: 'DESC',
       };
@@ -42,14 +62,18 @@ export const useBukids = () => {
       if (status) params.status = status;
 
       const bukidRes = await bukidAPI.getAll(params);
+      if (controller.signal.aborted || !isMountedRef.current) return;
       if (!bukidRes.status) throw new Error(bukidRes.message || 'Failed to fetch bukids');
 
       const bukidList = bukidRes.data.items;
       setTotalCount(bukidRes.data.pagination.total);
       setTotalPages(bukidRes.data.pagination.pages);
 
-      // Fetch pitaks to attach to bukids (for plots column)
+      // Fetch pitaks para sa plots column (limit 1000, pero maaaring i‑paginate kung marami)
+      // Hindi ito dapat mag‑trigger ng bagong fetch ng bukids
       const pitakRes = await pitakAPI.getAll({ limit: 1000 });
+      if (controller.signal.aborted || !isMountedRef.current) return;
+
       const pitaksByBukid = new Map<number, Pitak[]>();
       if (pitakRes.status && pitakRes.data.items) {
         pitakRes.data.items.forEach((pitak) => {
@@ -65,13 +89,19 @@ export const useBukids = () => {
         ...b,
         pitaks: pitaksByBukid.get(b.id) || [],
       }));
-      setBukids(enriched);
-    } catch (error) {
+
+      if (!controller.signal.aborted && isMountedRef.current) {
+        setBukids(enriched);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
       console.error('Failed to fetch bukids', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [page, pageSize, search, status]);
+  }, [page, search, status]); // PAGE_SIZE ay constant, hindi kailangan
 
   useEffect(() => {
     fetchBukids();
@@ -128,7 +158,6 @@ export const useBukids = () => {
   };
 
   return {
-    // State
     bukids,
     loading,
     page,
@@ -137,14 +166,11 @@ export const useBukids = () => {
     filters: { search, status },
     selectedBukid,
     editingBukid,
-    // Modal states
     viewModal,
     formModal,
-    // Setters
     setPage,
     setSearch,
     setStatus,
-    // Handlers
     handleDelete,
     handleView,
     handleEdit,

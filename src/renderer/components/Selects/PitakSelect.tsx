@@ -18,7 +18,7 @@ const PitakSelect: React.FC<PitakSelectProps> = ({ bukidId, ...props }) => {
     if (bukidId) params.bukidId = bukidId;
     const res = await pitakAPI.getAll(params);
     if (!res.status) return [];
-    return res.data.items.map((p) => ({
+    return res.data?.items?.map((p) => ({
       id: p.id,
       label: p.location,
       subLabel: p.area ? `${p.area} sqm` : undefined,

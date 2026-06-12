@@ -1,5 +1,5 @@
-// src/renderer/api/debtAPI.ts
-// Updated to use common pagination types and align with refactored DebtService
+// src/renderer/api/core/debtAPI.ts
+// Fixed pagination: backend returns { data, pagination } -> frontend expects { items, pagination }
 
 import type { DebtHistory } from "./debt_history";
 import type { Session } from "./session";
@@ -69,7 +69,7 @@ export interface DebtFilters extends BaseFilters {
 }
 
 // ----------------------------------------------------------------------
-// 🧠 DebtAPI Class (using common types)
+// 🧠 DebtAPI Class (with pagination transformation)
 // ----------------------------------------------------------------------
 
 class DebtAPI {
@@ -82,24 +82,31 @@ class DebtAPI {
     return window.backendAPI.debt({ method, params });
   }
 
-  // 🔎 READ (with pagination)
+  private toPaginatedResponse<T>(raw: any): PaginatedResponse<T> {
+    return {
+      items: raw.data || [],
+      pagination: raw.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+    };
+  }
 
-  /**
-   * Get all debts with optional filters (paginated)
-   */
+  // 🔎 READ
+
   async getAll(params?: DebtFilters): Promise<DebtsResponse> {
     try {
-      const response = await this.call<DebtsResponse>("getAllDebts", params || {});
-      if (response.status) return response;
+      const response = await this.call<any>("getAllDebts", params || {});
+      if (response.status) {
+        return {
+          status: true,
+          message: response.message,
+          data: this.toPaginatedResponse<Debt>(response.data),
+        };
+      }
       throw new Error(response.message || "Failed to fetch debts");
     } catch (error: any) {
       throw new Error(error.message || "Failed to fetch debts");
     }
   }
 
-  /**
-   * Get debt by ID
-   */
   async getById(id: number): Promise<DebtResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -111,9 +118,6 @@ class DebtAPI {
     }
   }
 
-  /**
-   * Get debts by worker ID (paginated)
-   */
   async getByWorker(
     workerId: number,
     params?: Omit<DebtFilters, "workerId">
@@ -121,9 +125,6 @@ class DebtAPI {
     return this.getAll({ ...params, workerId });
   }
 
-  /**
-   * Get debts by session ID (paginated)
-   */
   async getBySession(
     sessionId: number,
     params?: Omit<DebtFilters, "sessionId">
@@ -131,9 +132,6 @@ class DebtAPI {
     return this.getAll({ ...params, sessionId });
   }
 
-  /**
-   * Get debt statistics
-   */
   async getStats(sessionId?: number): Promise<DebtStatsResponse> {
     try {
       const response = await this.call<DebtStatsResponse>("getDebtStats", { sessionId });
@@ -146,9 +144,6 @@ class DebtAPI {
 
   // ✏️ WRITE
 
-  /**
-   * Create a new debt
-   */
   async create(data: DebtCreateData): Promise<DebtResponse> {
     try {
       const response = await this.call<DebtResponse>("createDebt", data);
@@ -159,9 +154,6 @@ class DebtAPI {
     }
   }
 
-  /**
-   * Update an existing debt
-   */
   async update(id: number, data: DebtUpdateData): Promise<DebtResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -173,9 +165,6 @@ class DebtAPI {
     }
   }
 
-  /**
-   * Update debt status
-   */
   async updateStatus(id: number, status: string): Promise<DebtResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -187,9 +176,6 @@ class DebtAPI {
     }
   }
 
-  /**
-   * Soft delete a debt
-   */
   async delete(id: number): Promise<DebtResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
@@ -201,9 +187,6 @@ class DebtAPI {
     }
   }
 
-  /**
-   * Restore a soft-deleted debt
-   */
   async restore(id: number): Promise<DebtResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");

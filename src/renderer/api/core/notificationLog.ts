@@ -1,4 +1,4 @@
-// src/renderer/api/notificationLog.ts
+// src/renderer/api/core/notificationLog.ts
 // Refactored – uses common pagination types and aligns with backend NotificationLogService
 
 import type { PaginatedResponse, ApiResponse, BaseFilters } from "../shared";
