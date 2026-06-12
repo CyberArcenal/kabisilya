@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kabisilya - Loading</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: transparent;
+        color: #1e293b;
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 20px;
+        overflow: hidden;
+      }
+      .container {
+        max-width: 400px;
+        width: 90%;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.25);
+        padding: 2rem 1.5rem;
+        border: 1px solid #e5e7eb;
+      }
+      .logo {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 1.2rem;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 8px 16px -6px rgba(34, 197, 94, 0.3);
+        background: linear-gradient(135deg, #22c55e, #15803d);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 0;
+        font-size: 0;
+      }
+      .logo img {
+        width: 112%;
+        height: 120%;
+        object-fit: cover;
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: none;
+      }
+      .fallback-svg {
+        width: 36px;
+        height: 36px;
+        display: block;
+      }
+      h1 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        background: linear-gradient(135deg, #22c55e, #15803d);
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+        margin-bottom: 0.25rem;
+      }
+      .sub {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 1.8rem;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 4px;
+        background: #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 1rem;
+      }
+      .progress-fill {
+        width: 0%;
+        height: 100%;
+        background: #22c55e;
+        border-radius: 10px;
+        animation: loading 2s ease-in-out infinite;
+      }
+      .loading-text {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #4b5563;
+        margin-bottom: 1rem;
+        min-height: 2rem;
+        transition: opacity 0.2s;
+      }
+      .migration-status {
+        display: none;
+        font-size: 0.75rem;
+        background: #f0fdf4;
+        color: #166534;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        border: 1px solid #bbf7d0;
+        margin-top: 0.8rem;
+      }
+      .version {
+        margin-top: 2rem;
+        font-size: 0.7rem;
+        color: #9ca3af;
+      }
+      @keyframes loading {
+        0% {
+          width: 0%;
+          opacity: 0.7;
+        }
+        50% {
+          width: 100%;
+          opacity: 1;
+        }
+        100% {
+          width: 0%;
+          opacity: 0.7;
+        }
+      }
+      .ready {
+        color: #22c55e;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo" id="logo-container">
+        <img
+          id="app-icon"
+          src="../assets/icon.png"
+          alt="Kabisilya"
+        />
+      </div>
+      <h1>Kabisilya</h1>
+      <div class="sub">Farm Management System</div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="loading-text" id="loading-text">Initializing...</div>
+
+      <div class="migration-status" id="migration-status">
+        <span id="migration-message"></span>
+      </div>
+
+      <div class="version" id="version-text">v1.0.0</div>
+    </div>
+
+    <script>
+      function showFallbackIcon() {
+        const container = document.getElementById('logo-container');
+        if (!container || container.querySelector('.fallback-svg')) return;
+        
+        container.innerHTML = '';
+        
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', '36');
+        svg.setAttribute('height', '36');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'white');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.classList.add('fallback-svg');
+        
+        // Rice plant / leaf icon
+        const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path1.setAttribute('d', 'M12 2v6M9 9l3-3 3 3M6 15l3-3 3 3 3-3 3 3');
+        const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path2.setAttribute('d', 'M12 22v-4');
+        
+        svg.appendChild(path1);
+        svg.appendChild(path2);
+        container.appendChild(svg);
+        container.style.background = 'linear-gradient(135deg, #22c55e, #15803d)';
+        console.log('Icon failed to load, using fallback SVG');
+      }
+      
+      const iconImg = document.getElementById('app-icon');
+      if (iconImg) {
+        iconImg.onerror = showFallbackIcon;
+        iconImg.onload = () => console.log('App icon loaded successfully');
+      } else {
+        showFallbackIcon();
+      }
+
+      const loadingMessages = [
+        "Loading modules...",
+        "Connecting to database...",
+        "Loading farm data...",
+        "Syncing worker profiles...",
+        "Preparing assignments...",
+        "Almost ready...",
+        "Welcome to Kabisilya!",
+      ];
+      let step = 0;
+      const loadingEl = document.getElementById("loading-text");
+      const migrationStatusDiv = document.getElementById("migration-status");
+      const migrationMsgSpan = document.getElementById("migration-message");
+
+      let msgInterval = setInterval(() => {
+        if (migrationStatusDiv.style.display === "block") return;
+        loadingEl.style.opacity = "0.5";
+        setTimeout(() => {
+          step = (step + 1) % loadingMessages.length;
+          loadingEl.textContent = loadingMessages[step];
+          loadingEl.style.opacity = "1";
+        }, 150);
+      }, 1800);
+
+      if (window.backendAPI) {
+        window.backendAPI.on("migration:status", (event, data) => {
+          clearInterval(msgInterval);
+          migrationStatusDiv.style.display = "block";
+
+          if (data.status === "running") {
+            migrationMsgSpan.textContent = data.message || "Updating database structure...";
+            migrationStatusDiv.style.background = "#fefce8";
+            migrationStatusDiv.style.borderColor = "#fde047";
+            migrationStatusDiv.style.color = "#854d0e";
+            loadingEl.textContent = "Applying updates...";
+          } else if (data.status === "completed") {
+            migrationMsgSpan.textContent = data.message || "Database update completed ✓";
+            migrationStatusDiv.style.background = "#ecfdf5";
+            migrationStatusDiv.style.borderColor = "#a7f3d0";
+            migrationStatusDiv.style.color = "#065f46";
+            loadingEl.textContent = "Ready ✓";
+            loadingEl.classList.add("ready");
+            document.getElementById("progress-fill").style.animation = "none";
+            document.getElementById("progress-fill").style.width = "100%";
+          } else if (data.status === "failed") {
+            migrationMsgSpan.textContent = data.message || "Migration failed ✗";
+            migrationStatusDiv.style.background = "#fef2f2";
+            migrationStatusDiv.style.borderColor = "#fecaca";
+            migrationStatusDiv.style.color = "#991b1b";
+            loadingEl.textContent = "Database issue detected";
+          }
+        });
+      } else {
+        console.warn("backendAPI not available, cannot listen to migration events");
+      }
+    </script>
+  </body>
+</html>
