@@ -17,11 +17,10 @@ contextBridge.exposeInMainWorld("backendAPI", {
   activation: (payload) => ipcRenderer.invoke("activation", payload),
   auditLog: (payload) => ipcRenderer.invoke("auditLog", payload),
   notification: (payload) => ipcRenderer.invoke("notification", payload),
-  notificationLog: (payload) => ipcRenderer.invoke("notificationLog", payload),
   session: (payload) => ipcRenderer.invoke("session", payload),
   systemConfig: (payload) => ipcRenderer.invoke("systemConfig", payload),
   workerPayment: (payload) => ipcRenderer.invoke("workerPayment", payload),
-
+  reminderLog: (payload) => ipcRenderer.invoke("reminderLog", payload),
   // Exports
   auditExport: (payload) => ipcRenderer.invoke("auditExport", payload),
   themes: (payload) => ipcRenderer.invoke("themes", payload),
@@ -69,4 +68,5 @@ contextBridge.exposeInMainWorld("backendAPI", {
     ipcRenderer.on(event, callback);
     return () => ipcRenderer.removeListener(event, callback);
   },
+  off: (channel, callback) => ipcRenderer.removeListener(channel, callback),
 });

@@ -1,103 +1,97 @@
 // src/subscribers/NotificationSubscriber.js
-// @ts-check
+//@ts-check
 const Notification = require("../entities/Notification");
+const { NotificationStateTransitionService } = require("../stateTransitionService/Notification");
 const { logger } = require("../utils/logger");
+
 
 console.log("[Subscriber] Loading NotificationSubscriber");
 
 class NotificationSubscriber {
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService(dataSource) {
+    if (!this.transitionService) {
+      this.transitionService = new NotificationStateTransitionService(dataSource);
+    }
+    return this.transitionService;
+  }
+
   listenTo() {
     return Notification;
   }
 
-  /**
-     * @param {any} entity
-     */
-  async beforeInsert(entity) {
+  async beforeInsert(entity, { manager, queryRunner }) {
     try {
-      // @ts-ignore
       logger.info("[NotificationSubscriber] beforeInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
+        id: entity.id,
+        title: entity.title,
+        type: entity.type,
+        debtId: entity.debt?.id,
       });
     } catch (err) {
-      // @ts-ignore
       logger.error("[NotificationSubscriber] beforeInsert error", err);
+      throw err;
     }
   }
 
-  /**
-     * @param {any} entity
-     */
-  async afterInsert(entity) {
-    try {
-      // @ts-ignore
+  async afterInsert(entity, { manager, queryRunner }) {
+   try {
       logger.info("[NotificationSubscriber] afterInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
+        id: entity.id,
+        title: entity.title,
+        type: entity.type,
+        debtId: entity.debt?.id,
       });
+      // Call onCreate transition
+      const service = await this.getTransitionService(manager.connection);
+      await service.onCreate(entity, "system", queryRunner);
     } catch (err) {
-      // @ts-ignore
       logger.error("[NotificationSubscriber] afterInsert error", err);
+      // Don't throw to avoid breaking the transaction
     }
   }
 
-  /**
-     * @param {any} entity
-     */
-  async beforeUpdate(entity) {
+  async beforeUpdate(entity, { manager, queryRunner }) {
     try {
-      // @ts-ignore
-      logger.info("[NotificationSubscriber] beforeUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logger.info("[NotificationSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
-      // @ts-ignore
       logger.error("[NotificationSubscriber] beforeUpdate error", err);
+      throw err;
     }
   }
 
-  /**
-     * @param {{ entity: any; }} event
-     */
-  async afterUpdate(event) {
+  async afterUpdate(event, { manager, queryRunner }) {
     try {
-      const { entity } = event;
-      // @ts-ignore
-      logger.info("[NotificationSubscriber] afterUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      const { entity, databaseEntity } = event;
+      logger.info("[NotificationSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService(manager.connection);
+      if (entity.isRead && !databaseEntity.isRead) {
+        await service.onRead(entity, "system", queryRunner);
+      }
     } catch (err) {
-      // @ts-ignore
       logger.error("[NotificationSubscriber] afterUpdate error", err);
+      throw err;
     }
   }
 
-  /**
-     * @param {any} entity
-     */
-  async beforeRemove(entity) {
+  async beforeRemove(entity, { manager, queryRunner }) {
     try {
-      // @ts-ignore
-      logger.info("[NotificationSubscriber] beforeRemove", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logger.info("[NotificationSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
-      // @ts-ignore
       logger.error("[NotificationSubscriber] beforeRemove error", err);
+      throw err;
     }
   }
 
-  /**
-     * @param {any} event
-     */
-  async afterRemove(event) {
+  async afterRemove(event, { manager, queryRunner }) {
     try {
-      // @ts-ignore
-      logger.info("[NotificationSubscriber] afterRemove", {
-        event: JSON.parse(JSON.stringify(event)),
-      });
+      logger.info("[NotificationSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
-      // @ts-ignore
       logger.error("[NotificationSubscriber] afterRemove error", err);
+      throw err;
     }
   }
 }

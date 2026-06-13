@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import PageNotFound from "../components/Shared/PageNotFound";
-import ProtectedRoute from "../app/ProtectedRoute";
 import Layout from "../layouts/Layout";
 import { LicenseModal } from "../components/Shared/LicenseModal";
 import { useEffect, useState } from "react";
@@ -15,9 +14,7 @@ import WorkersPage from "../pages/workers";
 import WorkerPaymentsPage from "../pages/finance/worker-payments";
 import DebtsPage from "../pages/finance/debts";
 import NotificationsPage from "../pages/notifications";
-import NotificationLogsPage from "../pages/notification-logs";
 import AuditPage from "../pages/audit";
-import FarmManagementSettingsPage from "../pages/settings";
 import PaymentHistoryPage from "../pages/finance/payment-history";
 import DebtHistoryPage from "../pages/finance/debt-history";
 import BukidReportsPage from "../pages/reports/bukid";
@@ -25,6 +22,8 @@ import FinancialReportsPage from "../pages/reports/financial";
 import PitakProductivityPage from "../pages/reports/pitak";
 import WorkerPerformancePage from "../pages/reports/workers";
 import SessionsPage from "../pages/system/sessions";
+import ReminderLogPage from "../pages/reminder";
+import FarmManagementSettingsPage from "../pages/system/Settings";
 
 function App() {
   const [licenseAccepted, setLicenseAccepted] = useState(false);
@@ -100,7 +99,7 @@ function App() {
         
         {/* Notifications & Logs */}
         <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/notification-logs" element={<NotificationLogsPage />} />
+        <Route path="/reminders" element={<ReminderLogPage/>}/>
 
         {/* System */}
         <Route path="/audit" element={<AuditPage />} />

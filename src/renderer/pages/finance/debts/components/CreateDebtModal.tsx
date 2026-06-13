@@ -4,8 +4,9 @@ import type { DebtFormData } from "../types";
 import debtAPI from "../../../../api/core/debt";
 import Modal from "../../../../components/UI/Modal";
 import WorkerSelect from "../../../../components/Selects/WorkerSelect";
-import SessionSelect from "../../../../components/Selects/SessionSelect";
 import Button from "../../../../components/UI/Button";
+import { showWarning } from "../../../../utils/notification";
+import { useDefaultSessionId } from "../../../../utils/config/farmConfig";
 
 interface Props {
   isOpen: boolean;
@@ -14,24 +15,16 @@ interface Props {
   initialData?: (DebtFormData & { id?: number }) | null;
 }
 
-const statusOptions = [
-  { value: "pending", label: "Pending" },
-  { value: "partially_paid", label: "Partially Paid" },
-  { value: "paid", label: "Paid" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "overdue", label: "Overdue" },
-  { value: "settled", label: "Settled" },
-];
-
 const CreateDebtModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
+  const defaultSessionId = useDefaultSessionId();
   const [form, setForm] = useState<DebtFormData>({
     workerId: 0,
-    sessionId: 0,
+    sessionId: defaultSessionId || 0,
     amount: 0,
     dueDate: "",
     interestRate: 0,
     reason: "",
-    status: "pending",
+    status: "pending", // always pending for new, kept for edit
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,23 +40,28 @@ const CreateDebtModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
           reason: initialData.reason || "",
           status: initialData.status || "pending",
         });
+      } else if (defaultSessionId) {
+        setForm(prev => ({ ...prev, sessionId: defaultSessionId, status: "pending" }));
       } else {
-        setForm({
-          workerId: 0,
-          sessionId: 0,
-          amount: 0,
-          dueDate: "",
-          interestRate: 0,
-          reason: "",
-          status: "pending",
-        });
+        setForm(prev => ({ ...prev, sessionId: 0, status: "pending" }));
       }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, defaultSessionId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.workerId || !form.sessionId || form.amount <= 0) return;
+    if (!form.workerId) {
+      showWarning("Please select a worker.");
+      return;
+    }
+    if (!form.sessionId) {
+      showWarning("No default session configured. Please set a default session in system settings.");
+      return;
+    }
+    if (form.amount <= 0) {
+      showWarning("Amount must be greater than zero.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload: any = {
@@ -73,7 +71,7 @@ const CreateDebtModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
         dueDate: form.dueDate || undefined,
         interestRate: form.interestRate || undefined,
         reason: form.reason || undefined,
-        status: form.status as any,
+        status: initialData?.id ? form.status : "pending", // force pending on create
       };
       if (initialData?.id) {
         await debtAPI.update(initialData.id, payload);
@@ -84,6 +82,7 @@ const CreateDebtModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
       onClose();
     } catch (error) {
       console.error("Failed to save debt", error);
+      showWarning("Failed to save debt. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -95,10 +94,6 @@ const CreateDebtModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
         <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Worker *</label>
           <WorkerSelect value={form.workerId} onChange={(id) => setForm({ ...form, workerId: id || 0 })} placeholder="Select worker" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Session *</label>
-          <SessionSelect value={form.sessionId} onChange={(id) => setForm({ ...form, sessionId: id || 0 })} placeholder="Select session" />
         </div>
         <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Amount (₱) *</label>
@@ -116,16 +111,15 @@ const CreateDebtModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Reason</label>
           <textarea rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]" style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }} />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status</label>
-          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]" style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}>
-            {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-          </select>
-        </div>
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" loading={submitting}>{initialData?.id ? "Update" : "Create"}</Button>
+          <Button variant="primary" type="submit" loading={submitting} disabled={!defaultSessionId}>
+            {initialData?.id ? "Update" : "Create"}
+          </Button>
         </div>
+        {!defaultSessionId && (
+          <p className="text-xs text-red-500 mt-1">No default session configured. Please set a default session in system settings.</p>
+        )}
       </form>
     </Modal>
   );

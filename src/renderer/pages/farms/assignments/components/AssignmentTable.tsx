@@ -52,6 +52,8 @@ const AssignmentTable: React.FC<AssignmentTableProps> = ({
     );
   }
 
+  // console.log(assignments)
+
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)]">
       <table className="w-full text-sm">
@@ -68,6 +70,7 @@ const AssignmentTable: React.FC<AssignmentTableProps> = ({
         </thead>
         <tbody>
           {assignments.map((assignment) => (
+            
             <tr key={assignment.id} className="border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors">
               <td className="py-2.5 px-4">
                 <div className="flex items-center gap-2">

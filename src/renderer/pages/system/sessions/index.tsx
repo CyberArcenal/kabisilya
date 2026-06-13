@@ -12,7 +12,6 @@ import ChangeSessionStatusModal from "./components/ChangeSessionStatusModal";
 
 const statusOptions = [
   { value: "", label: "All Status" },
-  { value: "initiated", label: "Initiated" },
   { value: "active", label: "Active" },
   { value: "closed", label: "Closed" },
   { value: "archived", label: "Archived" },

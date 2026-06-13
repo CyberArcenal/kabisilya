@@ -4,6 +4,7 @@ import Modal from "../../../components/UI/Modal";
 import Button from "../../../components/UI/Button";
 import type { WorkerFormData } from "../types";
 import workerAPI from "../../../api/core/worker";
+import { showWarning, showError } from "../../../utils/notification";
 
 interface Props {
   isOpen: boolean;
@@ -12,20 +13,13 @@ interface Props {
   initialData?: (WorkerFormData & { id?: number }) | null;
 }
 
-const statusOptions = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-  { value: "on-leave", label: "On Leave" },
-  { value: "terminated", label: "Terminated" },
-];
-
 const CreateWorkerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
   const [form, setForm] = useState<WorkerFormData>({
     name: "",
     contact: "",
     email: "",
     address: "",
-    status: "active",
+    status: "active", // default for new workers
     hireDate: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +31,7 @@ const CreateWorkerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initia
         contact: initialData.contact || "",
         email: initialData.email || "",
         address: initialData.address || "",
-        status: initialData.status,
+        status: initialData.status, // keep original status for edit
         hireDate: initialData.hireDate || "",
       });
     } else {
@@ -54,15 +48,18 @@ const CreateWorkerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initia
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) {
+      showWarning("Please enter the worker's full name.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
-        name: form.name,
-        contact: form.contact || undefined,
-        email: form.email || undefined,
-        address: form.address || undefined,
-        status: form.status,
+        name: form.name.trim(),
+        contact: form.contact?.trim() || undefined,
+        email: form.email?.trim() || undefined,
+        address: form.address?.trim() || undefined,
+        status: initialData?.id ? form.status : "active", // force active on create
         hireDate: form.hireDate || undefined,
       };
       if (initialData?.id) {
@@ -72,8 +69,9 @@ const CreateWorkerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initia
       }
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save worker", error);
+      showError(error.message || "Failed to save worker. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -122,19 +120,6 @@ const CreateWorkerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initia
             className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
             style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Hire Date</label>

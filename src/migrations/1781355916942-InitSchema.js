@@ -7,8 +7,8 @@
  * @class
  * @implements {MigrationInterface}
  */
-module.exports = class InitSchema1781209114546 {
-    name = 'InitSchema1781209114546'
+module.exports = class InitSchema1781355916942 {
+    name = 'InitSchema1781355916942'
 
     /**
      * @param {QueryRunner} queryRunner
@@ -36,7 +36,7 @@ module.exports = class InitSchema1781209114546 {
         await queryRunner.query(`CREATE TABLE "notifications" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "userId" integer, "title" varchar(255) NOT NULL, "message" text NOT NULL, "type" varchar CHECK( "type" IN ('info','success','warning','error','purchase','sale') ) NOT NULL DEFAULT ('info'), "isRead" boolean NOT NULL DEFAULT (0), "metadata" text, "createdAt" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "deletedAt" datetime, "updatedAt" datetime DEFAULT (datetime('now')))`);
         await queryRunner.query(`CREATE INDEX "idx_notifications_user_read" ON "notifications" ("userId", "isRead") `);
         await queryRunner.query(`CREATE INDEX "idx_notifications_created" ON "notifications" ("createdAt") `);
-        await queryRunner.query(`CREATE TABLE "notification_logs" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "recipient_email" varchar NOT NULL, "subject" varchar, "payload" text, "status" varchar(20) NOT NULL DEFAULT ('queued'), "error_message" text, "retry_count" integer NOT NULL DEFAULT (0), "resend_count" integer NOT NULL DEFAULT (0), "sent_at" datetime, "last_error_at" datetime, "created_at" datetime NOT NULL DEFAULT (datetime('now')), "updated_at" datetime NOT NULL DEFAULT (datetime('now')), "deletedAt" datetime)`);
+        await queryRunner.query(`CREATE TABLE "notification_logs" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "recipient_email" varchar NOT NULL, "subject" varchar, "payload" text, "status" varchar(20) NOT NULL DEFAULT ('queued'), "error_message" text, "retry_count" integer NOT NULL DEFAULT (0), "resend_count" integer NOT NULL DEFAULT (0), "sent_at" datetime, "last_error_at" datetime, "created_at" datetime NOT NULL DEFAULT (datetime('now')), "updated_at" datetime NOT NULL DEFAULT (datetime('now')))`);
         await queryRunner.query(`CREATE INDEX "IDX_notification_status" ON "notification_logs" ("status") `);
         await queryRunner.query(`CREATE INDEX "IDX_notification_recipient" ON "notification_logs" ("recipient_email") `);
         await queryRunner.query(`CREATE INDEX "IDX_notification_status_created" ON "notification_logs" ("status", "created_at") `);
@@ -57,7 +57,7 @@ module.exports = class InitSchema1781209114546 {
         await queryRunner.query(`CREATE TABLE "workers" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "contact" varchar, "email" varchar, "address" varchar, "status" varchar CHECK( "status" IN ('active','inactive','on-leave','terminated') ) NOT NULL DEFAULT ('active'), "hireDate" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "deletedAt" datetime, "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), CONSTRAINT "UQ_87f2092ffaae628ef63547d2442" UNIQUE ("email"))`);
         await queryRunner.query(`CREATE INDEX "IDX_WORKER_STATUS" ON "workers" ("status") `);
         await queryRunner.query(`CREATE INDEX "IDX_WORKER_NAME" ON "workers" ("name") `);
-        await queryRunner.query(`CREATE TABLE "system_settings" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "key" varchar(100) NOT NULL, "value" text NOT NULL, "setting_type" varchar CHECK( "setting_type" IN ('general','collections','loans','notifications','reports','integrations','audit_security') ) NOT NULL, "description" text, "is_public" boolean NOT NULL DEFAULT (0), "is_deleted" boolean NOT NULL DEFAULT (0), "created_at" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "updated_at" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP))`);
+        await queryRunner.query(`CREATE TABLE "system_settings" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "key" varchar(100) NOT NULL, "value" text NOT NULL, "setting_type" varchar CHECK( "setting_type" IN ('general','notification','farm_session','farm_bukid','farm_pitak','farm_assignment','farm_payment','farm_debt','farm_audit') ) NOT NULL, "description" text, "is_public" boolean NOT NULL DEFAULT (0), "is_deleted" boolean NOT NULL DEFAULT (0), "created_at" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "updated_at" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "idx_system_settings_type_key" ON "system_settings" ("setting_type", "key") `);
         await queryRunner.query(`DROP INDEX "IDX_ASSIGNMENT_DATE"`);
         await queryRunner.query(`DROP INDEX "IDX_ASSIGNMENT_STATUS"`);

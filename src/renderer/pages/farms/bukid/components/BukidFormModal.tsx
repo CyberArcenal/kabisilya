@@ -2,8 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../../../../components/UI/Modal';
 import Button from '../../../../components/UI/Button';
-import SessionSelect from '../../../../components/Selects/SessionSelect';
 import bukidAPI from '../../../../api/core/bukid';
+import { showWarning } from '../../../../utils/notification';
+import { useDefaultSessionId } from '../../../../utils/config/farmConfig';
 
 interface BukidFormModalProps {
   isOpen: boolean;
@@ -15,25 +16,17 @@ interface BukidFormModalProps {
     sessionId: number;
     status: string;
     location?: string;
-    area?: number;
     description?: string;
   } | null;
 }
 
-const statusOptions = [
-  { value: 'initiated', label: 'Initiated' },
-  { value: 'active', label: 'Active' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
 const BukidFormModal: React.FC<BukidFormModalProps> = ({ isOpen, onClose, onSuccess, initialData }) => {
+  const defaultSessionId = useDefaultSessionId();
   const [form, setForm] = useState({
     name: '',
-    sessionId: 0,
+    sessionId: defaultSessionId || 0,
     status: 'active',
     location: '',
-    area: '',
     description: '',
   });
   const [loading, setLoading] = useState(false);
@@ -43,36 +36,35 @@ const BukidFormModal: React.FC<BukidFormModalProps> = ({ isOpen, onClose, onSucc
       setForm({
         name: initialData.name,
         sessionId: initialData.sessionId,
-        status: initialData.status,
+        status: initialData.status === 'initiated' ? 'active' : initialData.status,
         location: initialData.location || '',
-        area: initialData.area !== undefined ? String(initialData.area) : '',
         description: initialData.description || '',
       });
+    } else if (defaultSessionId) {
+      setForm(prev => ({ ...prev, sessionId: defaultSessionId, status: 'active' }));
     } else {
-      setForm({
-        name: '',
-        sessionId: 0,
-        status: 'active',
-        location: '',
-        area: '',
-        description: '',
-      });
+      setForm(prev => ({ ...prev, sessionId: 0, status: 'active' }));
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, defaultSessionId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
-    if (!form.sessionId) return;
+    if (!form.name.trim()) {
+      showWarning('Please enter a farm name.');
+      return;
+    }
+    if (!form.sessionId) {
+      showWarning('No default session configured. Please set a default session in system settings.');
+      return;
+    }
 
     setLoading(true);
     try {
       const payload = {
         name: form.name.trim(),
         sessionId: form.sessionId,
-        status: form.status as "initiated" | "active" | "completed" | "cancelled" | undefined,
+        status: initialData?.id ? form.status as "active" | "initiated" | "completed" | "cancelled" | undefined : 'active',
         location: form.location.trim() || undefined,
-        area: form.area ? parseFloat(form.area) : undefined,
         description: form.description.trim() || undefined,
       };
       if (initialData?.id) {
@@ -83,6 +75,7 @@ const BukidFormModal: React.FC<BukidFormModalProps> = ({ isOpen, onClose, onSucc
       onSuccess();
     } catch (error) {
       console.error('Failed to save farm', error);
+      showWarning('Failed to save farm. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -103,41 +96,11 @@ const BukidFormModal: React.FC<BukidFormModalProps> = ({ isOpen, onClose, onSucc
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Session *</label>
-          <SessionSelect
-            value={form.sessionId}
-            onChange={(id) => setForm({ ...form, sessionId: id || 0 })}
-            onlyActive={false}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
-          >
-            {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-          </select>
-        </div>
-        <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Location</label>
           <input
             type="text"
             value={form.location}
             onChange={(e) => setForm({ ...form, location: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Area (ha)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={form.area}
-            onChange={(e) => setForm({ ...form, area: e.target.value })}
             className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
             style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
           />
@@ -154,10 +117,13 @@ const BukidFormModal: React.FC<BukidFormModalProps> = ({ isOpen, onClose, onSucc
         </div>
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" loading={loading}>
+          <Button variant="primary" type="submit" loading={loading} disabled={!defaultSessionId}>
             {initialData ? 'Update' : 'Create'}
           </Button>
         </div>
+        {!defaultSessionId && (
+          <p className="text-xs text-red-500 mt-1">No default session configured. Please set a default session in system settings.</p>
+        )}
       </form>
     </Modal>
   );

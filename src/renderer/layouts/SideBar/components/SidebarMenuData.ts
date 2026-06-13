@@ -113,8 +113,8 @@ export const menuItems: MenuItem[] = [
       },
       { path: "/audit", name: "Audit Trail", icon: ScrollText },
       {
-        path: "/notification-logs",
-        name: "Notify Log's",
+        path: "/reminders",
+        name: "Reminder Log's",
         icon: Bell,
       },
       {

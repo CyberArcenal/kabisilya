@@ -8,6 +8,7 @@ interface PaymentHistoryTableProps {
 }
 
 const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ history }) => {
+  console.log(history);
   if (history.length === 0) {
     return (
       <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">

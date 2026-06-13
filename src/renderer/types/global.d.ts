@@ -24,7 +24,7 @@ declare global {
       systemConfig: (payload: any) => Promise<any>;
       workerPayment: (payload: any) => Promise<any>;
       themes: (payload: any) => Promise<any>;
-
+      reminderLog: (payload: any) => Promise<any>;
       auditExport: (payload: any) => Promise<any>;
 
       showItemInFolder: (fullPath) => Promise<any>;
@@ -60,6 +60,7 @@ declare global {
         channel: string,
         callback: (event: any, ...args: any[]) => void,
       ) => () => void;
+      off: (channel: string, callback: (...args: any[]) => void) => void;
     };
   }
 }

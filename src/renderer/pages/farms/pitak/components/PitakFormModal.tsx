@@ -5,19 +5,14 @@ import pitakAPI from "../../../../api/core/pitak";
 import BukidSelect from "../../../../components/Selects/BukidSelect";
 import Modal from "../../../../components/UI/Modal";
 import Button from "../../../../components/UI/Button";
+import { showWarning } from "../../../../utils/notification";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  initialData?: (PitakFormData & { id?: number }) | null;  // ← allow null, id optional
+  initialData?: (PitakFormData & { id?: number }) | null;
 }
-
-const statusOptions = [
-  { value: "active", label: "Active" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
 
 const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
   const [form, setForm] = useState<PitakFormData>({
@@ -51,7 +46,10 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.bukidId) return;
+    if (!form.bukidId) {
+      showWarning("Please select a farm.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -59,7 +57,7 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
         location: form.location || undefined,
         area: form.area,
         description: form.description || undefined,
-        status: form.status as "active" | "completed" | "cancelled" | undefined,
+        status: initialData?.id ? form.status as "active" | "completed" | "cancelled" | undefined : "active",
       };
       if (initialData?.id) {
         await pitakAPI.update(initialData.id, payload);
@@ -69,7 +67,8 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Failed to save pitak", error);
+      console.error("Failed to save plot", error);
+      showWarning("Failed to save plot. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -78,7 +77,6 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={initialData?.id ? "Edit Plot" : "Add Plot"} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* ... rest of the form same as before ... */}
         <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Farm *</label>
           <BukidSelect
@@ -108,19 +106,6 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
             className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
             style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Description</label>

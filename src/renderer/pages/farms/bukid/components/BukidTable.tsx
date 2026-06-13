@@ -81,6 +81,8 @@ const BukidTable: React.FC<BukidTableProps> = ({
     );
   }
 
+  console.log(bukids)
+
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)]">
       <table className="w-full text-sm">

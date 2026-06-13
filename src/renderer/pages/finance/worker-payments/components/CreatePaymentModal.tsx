@@ -4,10 +4,11 @@ import type { PaymentFormData } from "../types";
 import paymentAPI from "../../../../api/core/payment";
 import Modal from "../../../../components/UI/Modal";
 import PitakSelect from "../../../../components/Selects/PitakSelect";
-import SessionSelect from "../../../../components/Selects/SessionSelect";
 import AssignmentSelect from "../../../../components/Selects/AssignmentSelect";
 import Button from "../../../../components/UI/Button";
 import WorkerSelect from "../../../../components/Selects/WorkerSelect";
+import { showWarning } from "../../../../utils/notification";
+import { useDefaultSessionId } from "../../../../utils/config/farmConfig";
 
 interface Props {
   isOpen: boolean;
@@ -16,25 +17,19 @@ interface Props {
   initialData?: (PaymentFormData & { id?: number }) | null;
 }
 
-const statusOptions = [
-  { value: "pending", label: "Pending" },
-  { value: "partially_paid", label: "Partially Paid" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
 const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
+  const defaultSessionId = useDefaultSessionId();
   const [form, setForm] = useState<PaymentFormData>({
     workerId: 0,
     pitakId: 0,
-    sessionId: 0,
+    sessionId: defaultSessionId || 0,
     assignmentId: null,
     amount: 0,
     manualDeduction: 0,
     netPay: 0,
     paymentDate: new Date().toISOString().split("T")[0],
     notes: "",
-    status: "pending",
+    status: "pending", // always pending for new, kept for edit
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,23 +47,14 @@ const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
         notes: initialData.notes || "",
         status: initialData.status || "pending",
       });
+    } else if (defaultSessionId) {
+      setForm(prev => ({ ...prev, sessionId: defaultSessionId, status: "pending" }));
     } else {
-      setForm({
-        workerId: 0,
-        pitakId: 0,
-        sessionId: 0,
-        assignmentId: null,
-        amount: 0,
-        manualDeduction: 0,
-        netPay: 0,
-        paymentDate: new Date().toISOString().split("T")[0],
-        notes: "",
-        status: "pending",
-      });
+      setForm(prev => ({ ...prev, sessionId: 0, status: "pending" }));
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, defaultSessionId]);
 
-  // Auto-calculate netPay when amount or deduction changes
+  // Auto-calculate netPay
   useEffect(() => {
     const net = (form.amount || 0) - (form.manualDeduction || 0);
     setForm(prev => ({ ...prev, netPay: net < 0 ? 0 : net }));
@@ -76,7 +62,22 @@ const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.workerId || !form.pitakId || !form.sessionId || form.amount <= 0) return;
+    if (!form.workerId) {
+      showWarning("Please select a worker.");
+      return;
+    }
+    if (!form.pitakId) {
+      showWarning("Please select a plot.");
+      return;
+    }
+    if (!form.sessionId) {
+      showWarning("No default session configured. Please set a default session in system settings.");
+      return;
+    }
+    if (form.amount <= 0) {
+      showWarning("Gross pay must be greater than zero.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -89,7 +90,7 @@ const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
         netPay: form.netPay,
         paymentDate: form.paymentDate,
         notes: form.notes || undefined,
-        status: form.status as "pending" | "partially_paid" | "completed" | "cancelled" | undefined,
+        status: initialData?.id ? form.status as "pending" | "partially_paid" | "completed" | "cancelled" | undefined : "pending", // force pending on create
       };
       if (initialData?.id) {
         await paymentAPI.update(initialData.id, payload);
@@ -100,6 +101,7 @@ const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
       onClose();
     } catch (error) {
       console.error("Failed to save payment", error);
+      showWarning("Failed to save payment. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -122,14 +124,6 @@ const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
             value={form.pitakId}
             onChange={(id) => setForm({ ...form, pitakId: id || 0 })}
             placeholder="Select plot"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Session *</label>
-          <SessionSelect
-            value={form.sessionId}
-            onChange={(id) => setForm({ ...form, sessionId: id || 0 })}
-            placeholder="Select session"
           />
         </div>
         <div>
@@ -191,19 +185,6 @@ const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          >
-            {statusOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Notes</label>
           <textarea
             rows={2}
@@ -215,10 +196,13 @@ const CreatePaymentModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
         </div>
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" loading={submitting}>
+          <Button variant="primary" type="submit" loading={submitting} disabled={!defaultSessionId}>
             {initialData?.id ? "Update" : "Create"}
           </Button>
         </div>
+        {!defaultSessionId && (
+          <p className="text-xs text-red-500 mt-1">No default session configured. Please set a default session in system settings.</p>
+        )}
       </form>
     </Modal>
   );

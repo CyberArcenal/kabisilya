@@ -14,12 +14,12 @@ const ipcModules = [
   "./ipc/utils/windows_control.ipc.js",
   "./ipc/core/session/index.ipc.js",
   "./ipc/core/notification/index.ipc.js",
-  "./ipc/core/notificationLog/index.ipc.js",
   "./ipc/utils/updater/index.ipc.js",
   "./ipc/utils/handlers/fileHandler.js",
   "./ipc/exports/audit/index.ipc.js",
   "./ipc/utils/worker_payment/index.ipc.js",
    "./ipc/core/themes/index.ipc.js",
+   "./ipc/core/reminder/index.ipc.js",
 ];
 
 module.exports = ipcModules;

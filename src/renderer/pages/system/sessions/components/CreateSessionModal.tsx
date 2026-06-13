@@ -4,6 +4,7 @@ import type { SessionFormData } from "../types";
 import sessionAPI from "../../../../api/core/session";
 import Modal from "../../../../components/UI/Modal";
 import Button from "../../../../components/UI/Button";
+import { showWarning, showError } from "../../../../utils/notification";
 
 interface Props {
   isOpen: boolean;
@@ -11,13 +12,6 @@ interface Props {
   onSuccess: () => void;
   initialData?: (SessionFormData & { id?: number }) | null;
 }
-
-const statusOptions = [
-  { value: "initiated", label: "Initiated" },
-  { value: "active", label: "Active" },
-  { value: "closed", label: "Closed" },
-  { value: "archived", label: "Archived" },
-];
 
 const seasonOptions = [
   { value: "Tag-ulan", label: "Tag-ulan (Rainy)" },
@@ -32,7 +26,7 @@ const CreateSessionModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
     startDate: "",
     endDate: "",
     seasonType: "",
-    status: "initiated",
+    status: "initiated", // default for new sessions
     notes: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -45,7 +39,7 @@ const CreateSessionModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
         startDate: initialData.startDate,
         endDate: initialData.endDate || "",
         seasonType: initialData.seasonType || "",
-        status: initialData.status,
+        status: initialData.status, // keep original for edit
         notes: initialData.notes || "",
       });
     } else {
@@ -63,16 +57,23 @@ const CreateSessionModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.startDate) return;
+    if (!form.name.trim()) {
+      showWarning("Please enter a session name.");
+      return;
+    }
+    if (!form.startDate) {
+      showWarning("Please select a start date.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
-        name: form.name,
+        name: form.name.trim(),
         year: form.year,
         startDate: form.startDate,
         endDate: form.endDate || undefined,
         seasonType: form.seasonType || undefined,
-        status: form.status,
+        status: initialData?.id ? form.status : "initiated", // force initiated on create
         notes: form.notes || undefined,
       };
       if (initialData?.id) {
@@ -82,8 +83,9 @@ const CreateSessionModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
       }
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save session", error);
+      showError(error.message || "Failed to save session. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -145,17 +147,6 @@ const CreateSessionModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initi
           >
             <option value="">Select season type</option>
             {seasonOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          >
-            {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </select>
         </div>
         <div>
