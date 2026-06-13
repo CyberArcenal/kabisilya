@@ -34,16 +34,16 @@ const Pitak = new EntitySchema({
       scale: 2,
       default: 0.0,
     },
-    notes: {type: String, nullable: true},
+    notes: { type: String, nullable: true },
 
     status: {
       type: String,
       default: "active",
-      enum: ["active", "completed", "cancelled"]
+      enum: ["active", "completed", "cancelled"],
     },
 
     createdAt: { type: Date, createDate: true },
-      deletedAt: { type: Date, nullable: true },
+    deletedAt: { type: Date, nullable: true },
     updatedAt: { type: Date, updateDate: true },
   },
   relations: {

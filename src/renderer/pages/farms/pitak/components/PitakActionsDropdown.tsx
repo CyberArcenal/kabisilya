@@ -1,6 +1,6 @@
 // src/renderer/pages/farms/pitak/components/PitakActionsDropdown.tsx
 import React, { useRef, useEffect, useState } from "react";
-import { Eye, Edit, GitBranch, Trash2, MoreVertical } from "lucide-react";
+import { Eye, Edit, GitBranch, Trash2, MoreVertical, Users, UserCheck } from "lucide-react";
 import { dialogs } from "../../../../utils/dialogs";
 import type { PitakWithWorkers } from "../types";
 
@@ -10,6 +10,8 @@ interface PitakActionsDropdownProps {
   onEdit: (pitak: PitakWithWorkers) => void;
   onDelete: (id: number) => void;
   onChangeStatus: (pitak: PitakWithWorkers) => void;
+  onBulkAssign?: (pitak: PitakWithWorkers) => void;
+  onViewAssignments?: (pitak: PitakWithWorkers) => void;
 }
 
 const PitakActionsDropdown: React.FC<PitakActionsDropdownProps> = ({
@@ -18,6 +20,8 @@ const PitakActionsDropdown: React.FC<PitakActionsDropdownProps> = ({
   onEdit,
   onDelete,
   onChangeStatus,
+  onBulkAssign,
+  onViewAssignments,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -47,7 +51,7 @@ const PitakActionsDropdown: React.FC<PitakActionsDropdownProps> = ({
   const getDropdownPosition = () => {
     if (!buttonRef.current) return {};
     const rect = buttonRef.current.getBoundingClientRect();
-    const dropdownHeight = 220;
+    const dropdownHeight = 260; // increased for new button
     const windowHeight = window.innerHeight;
 
     if (rect.bottom + dropdownHeight > windowHeight) {
@@ -85,6 +89,12 @@ const PitakActionsDropdown: React.FC<PitakActionsDropdownProps> = ({
     handleAction(() => onChangeStatus(pitak));
   };
 
+  const handleBulkAssignClick = () => {
+    if (onBulkAssign) {
+      handleAction(() => onBulkAssign(pitak));
+    }
+  };
+
   return (
     <div className="pitak-actions-dropdown-container" ref={dropdownRef}>
       <button
@@ -112,87 +122,85 @@ const PitakActionsDropdown: React.FC<PitakActionsDropdownProps> = ({
           }}
         >
           <div className="py-1">
-            {/* View Details */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAction(() => onView(pitak));
-              }}
+              onClick={() => handleAction(() => onView(pitak))}
               className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--card-hover-bg)"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
             >
               <Eye className="w-4 h-4 text-sky-500" />
               <span>View Details</span>
             </button>
 
-            {/* Edit (only if not locked) */}
             {!isLocked && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAction(() => onEdit(pitak));
-                }}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
-                style={{ color: "var(--text-primary)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "var(--card-hover-bg)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                <Edit className="w-4 h-4 text-yellow-500" />
-                <span>Edit Plot</span>
-              </button>
+              <>
+                <button
+                  onClick={() => handleAction(() => onEdit(pitak))}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                  style={{ color: "var(--text-primary)" }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--card-hover-bg)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  <Edit className="w-4 h-4 text-yellow-500" />
+                  <span>Edit Plot</span>
+                </button>
+
+                <button
+                  onClick={handleBulkAssignClick}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                  style={{ color: "var(--text-primary)" }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--card-hover-bg)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  <Users className="w-4 h-4 text-emerald-500" />
+                  <span>Assign Workers</span>
+                </button>
+              </>
             )}
 
-            {/* Change Status */}
+            <button
+  onClick={() => handleAction(() => onViewAssignments?.(pitak))}
+  className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+  style={{ color: "var(--text-primary)" }}
+  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--card-hover-bg)"}
+  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+>
+  <UserCheck className="w-4 h-4 text-indigo-500" />
+  <span>View Assignments</span>
+</button>
+
             <button
               onClick={handleStatusClick}
               className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--card-hover-bg)"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
             >
               <GitBranch className="w-4 h-4 text-blue-500" />
               <span>Change Status</span>
             </button>
 
-            {/* Divider */}
-            <div
-              className="border-t my-1"
-              style={{ borderColor: "var(--border-color)" }}
-            ></div>
-
-            {/* Delete */}
             {!isLocked && (
-              <button
-                onClick={handleDeleteClick}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
-                style={{ color: "var(--danger-color)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--danger-color)";
-                  e.currentTarget.style.color = "#ffffff";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "var(--danger-color)";
-                }}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Delete Plot</span>
-              </button>
+              <>
+                <div className="border-t my-1" style={{ borderColor: "var(--border-color)" }}></div>
+                <button
+                  onClick={handleDeleteClick}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                  style={{ color: "var(--danger-color)" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--danger-color)";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.color = "var(--danger-color)";
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Plot</span>
+                </button>
+              </>
             )}
           </div>
         </div>

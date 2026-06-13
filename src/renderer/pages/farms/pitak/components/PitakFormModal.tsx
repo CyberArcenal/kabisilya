@@ -1,7 +1,6 @@
 // src/renderer/pages/farms/pitak/components/PitakFormModal.tsx
 import React, { useEffect, useState } from "react";
-import type { PitakFormData } from "../types";
-import pitakAPI from "../../../../api/core/pitak";
+import pitakAPI, { type PitakCreateData } from "../../../../api/core/pitak";
 import BukidSelect from "../../../../components/Selects/BukidSelect";
 import Modal from "../../../../components/UI/Modal";
 import Button from "../../../../components/UI/Button";
@@ -11,16 +10,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  initialData?: (PitakFormData & { id?: number }) | null;
+  initialData?: (PitakCreateData & { id?: number }) | null;
 }
 
 const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
-  const [form, setForm] = useState<PitakFormData>({
+  const [form, setForm] = useState<PitakCreateData>({
     bukidId: 0,
     location: "",
-    area: undefined,
+    totalLuwang: undefined,
     description: "",
-    status: "active",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,17 +27,15 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
       setForm({
         bukidId: initialData.bukidId,
         location: initialData.location || "",
-        area: initialData.area,
+        totalLuwang: initialData.totalLuwang !== undefined ? initialData.totalLuwang : (initialData.area ?? undefined),
         description: initialData.description || "",
-        status: initialData.status,
       });
     } else {
       setForm({
         bukidId: 0,
         location: "",
-        area: undefined,
+        totalLuwang: undefined,
         description: "",
-        status: "active",
       });
     }
   }, [initialData, isOpen]);
@@ -52,12 +48,13 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
     }
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: PitakCreateData = {
         bukidId: form.bukidId,
-        location: form.location || undefined,
-        area: form.area,
-        description: form.description || undefined,
-        status: initialData?.id ? form.status as "active" | "completed" | "cancelled" | undefined : "active",
+        location: form.location?.trim() || undefined,
+        totalLuwang: form.totalLuwang,
+        description: form.description?.trim() || undefined,
+        // Status is forced to 'active' on create, preserved on update (but not editable)
+        status: initialData?.id ? undefined : "active",
       };
       if (initialData?.id) {
         await pitakAPI.update(initialData.id, payload);
@@ -97,12 +94,12 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Area (sqm)</label>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Area (luwang)</label>
           <input
             type="number"
             step="0.01"
-            value={form.area ?? ""}
-            onChange={(e) => setForm({ ...form, area: e.target.value ? parseFloat(e.target.value) : undefined })}
+            value={form.totalLuwang ?? ""}
+            onChange={(e) => setForm({ ...form, totalLuwang: e.target.value ? parseFloat(e.target.value) : undefined })}
             className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
             style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
           />

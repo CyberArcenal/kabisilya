@@ -12,7 +12,9 @@ interface PitakTableProps {
   onDelete: (id: number) => void;
   onWorkerClick: (worker: Worker) => void;
   onChangeStatus: (pitak: PitakWithWorkers) => void;
-  onViewAllWorkers?: (pitakId: number) => void; // new: navigate to assignments with pitak filter
+  onViewAllWorkers?: (pitakId: number) => void;
+  onBulkAssign?: (pitak: PitakWithWorkers) => void;
+  onViewAssignments?: (pitak: PitakWithWorkers) => void;
 }
 
 const statusBadge = (status: string) => {
@@ -37,6 +39,8 @@ const PitakTable: React.FC<PitakTableProps> = ({
   onWorkerClick,
   onChangeStatus,
   onViewAllWorkers,
+  onBulkAssign,
+  onViewAssignments,
 }) => {
   if (pitaks.length === 0) {
     return (
@@ -53,7 +57,7 @@ const PitakTable: React.FC<PitakTableProps> = ({
           <tr>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Location</th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Farm</th>
-            <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Area (sqm)</th>
+       <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Area (luwang)</th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Status</th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Assigned Workers</th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Actions</th>
@@ -71,7 +75,9 @@ const PitakTable: React.FC<PitakTableProps> = ({
                 </div>
               </td>
               <td className="py-2.5 px-4 text-[var(--text-secondary)]">{pitak.bukid?.name || "—"}</td>
-              <td className="py-2.5 px-4 text-[var(--text-secondary)]">{pitak.area ?? "—"}</td>
+            <td className="py-2.5 px-4 text-[var(--text-secondary)]">
+  {pitak.totalLuwang ?? '—'}
+</td>
               <td className="py-2.5 px-4">{statusBadge(pitak.status)}</td>
               <td className="py-2.5 px-4">
                 <WorkerAvatarStack
@@ -89,6 +95,8 @@ const PitakTable: React.FC<PitakTableProps> = ({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onChangeStatus={onChangeStatus}
+                  onBulkAssign={onBulkAssign}
+                  onViewAssignments={onViewAssignments}
                 />
               </td>
             </tr>

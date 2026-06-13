@@ -875,6 +875,11 @@ async function defaultCurrency() {
   // @ts-ignore
   return getValue("default_currency", SettingType.GENERAL, "PHP");
 }
+
+async function emailEnabled() {
+  return getBool("email_enabled", SettingType.NOTIFICATIONS, false);
+}
+
 module.exports = {
   defaultCurrency,
   auditLogEnabled,
@@ -887,6 +892,8 @@ module.exports = {
   getBool,
   getInt,
   getArray,
+
+  emailEnabled,
 
   // General settings
   companyName,

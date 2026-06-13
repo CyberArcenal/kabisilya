@@ -1,6 +1,6 @@
 // src/renderer/pages/farms/pitak/index.tsx
-import React from "react";
-import { Plus, Filter, X } from "lucide-react";
+import React, { useState } from "react";
+import { Plus, Filter, X, RefreshCw } from "lucide-react"; // added RefreshCw
 import Button from "../../../components/UI/Button";
 import Pagination from "../../../components/UI/Pagination";
 import LoadingSpinner from "../../../components/Shared/LoadingSpinner";
@@ -15,6 +15,9 @@ import ViewAssignmentModal from "../../../components/Modals/ViewAssignmentModal"
 import { useModal } from "../../../hooks/useModal";
 import ViewWorkerModal from "../../workers/components/ViewWorkerModal";
 import ChangePitakStatusModal from "./components/ChangePitakStatusModal";
+import BulkAssignModal from "../assignments/components/BulkAssignModal";
+import PitakAssignmentsModal from "./components/PitakAssignmentsModal";
+import type { PitakWithWorkers } from "./types";
 
 const PitakPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,21 +46,38 @@ const PitakPage: React.FC = () => {
     handleAddNew,
     handleFormSuccess,
     resetFilters,
+    refetch, // <-- ADD THIS
   } = usePitaks();
 
   const viewAssigmentModal = useModal();
   const workerViewModal = useModal();
-
+  const bulkAssignModal = useModal();
+  const assignmentsModal = useModal();
   const hasFilters = !!(filters.search || filters.bukidId || filters.status);
+  const [selectedPitakForAssignments, setSelectedPitakForAssignments] =
+    useState<{ id: number; location: string } | null>(null);
 
   const handleWorkerClick = (worker: Worker) => {
     workerViewModal.setSelected(worker.id);
     workerViewModal.open();
   };
 
+  const handleViewAssignments = (pitak: PitakWithWorkers) => {
+    setSelectedPitakForAssignments({ id: pitak.id, location: pitak.location });
+    assignmentsModal.open();
+  };
+
   const handleViewAllWorkers = (pitakId: number) => {
-  navigate(`/farms/assignments?pitak=${pitakId}`);
-};
+    navigate(`/farms/assignments?pitak=${pitakId}`);
+  };
+
+  const handleBulkAssign = (pitak: any) => {
+    bulkAssignModal.setInitial({
+      pitakId: pitak.id,
+      pitakLocation: pitak.location,
+    });
+    bulkAssignModal.open();
+  };
 
   return (
     <div className="p-6 space-y-4">
@@ -76,10 +96,20 @@ const PitakPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Filters Bar (inline, same as Bukid) */}
+      {/* Filters Bar */}
       <div className="bg-[var(--card-bg)] rounded-xl p-4 border border-[var(--border-color)] space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
-          <Filter className="w-4 h-4" /> Filters
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+            <Filter className="w-4 h-4" /> Filters
+          </div>
+          <button
+            onClick={refetch}
+            disabled={loading}
+            className="p-1.5 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors text-[var(--text-secondary)]"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <input
@@ -151,6 +181,8 @@ const PitakPage: React.FC = () => {
             onWorkerClick={handleWorkerClick}
             onChangeStatus={handleChangeStatus}
             onViewAllWorkers={handleViewAllWorkers}
+            onBulkAssign={handleBulkAssign}
+            onViewAssignments={handleViewAssignments}
           />
           <Pagination
             currentPage={page}
@@ -163,7 +195,7 @@ const PitakPage: React.FC = () => {
         </>
       )}
 
-      {/* Modals */}
+      {/* Modals – unchanged */}
       <PitakViewModal
         isOpen={viewModal.isOpen}
         onClose={viewModal.close}
@@ -179,16 +211,12 @@ const PitakPage: React.FC = () => {
       <ViewAssignmentModal
         isOpen={viewAssigmentModal.isOpen}
         onClose={() => viewAssigmentModal.close()}
-        assignmentId={
-          viewAssigmentModal.selectedId ? viewAssigmentModal.selectedId : null
-        }
+        assignmentId={viewAssigmentModal.selectedId || null}
       />
       <ViewWorkerModal
         isOpen={workerViewModal.isOpen}
         onClose={workerViewModal.close}
-        workerId={
-          workerViewModal.selectedId ? workerViewModal.selectedId : null
-        }
+        workerId={workerViewModal.selectedId || null}
       />
       <ChangePitakStatusModal
         isOpen={statusModal.isOpen}
@@ -196,6 +224,21 @@ const PitakPage: React.FC = () => {
         pitakLocation={statusChangePitak?.location || ""}
         currentStatus={statusChangePitak?.status || ""}
         onConfirm={handleConfirmStatusChange}
+      />
+      <BulkAssignModal
+        isOpen={bulkAssignModal.isOpen}
+        onClose={bulkAssignModal.close}
+        onSuccess={() => {
+          refetch();
+        }}
+        initialData={bulkAssignModal.initialData}
+      />
+      <PitakAssignmentsModal
+        isOpen={assignmentsModal.isOpen}
+        onClose={assignmentsModal.close}
+        pitakId={selectedPitakForAssignments?.id || 0}
+        pitakLocation={selectedPitakForAssignments?.location || ""}
+        onAssignmentDeleted={refetch}
       />
     </div>
   );

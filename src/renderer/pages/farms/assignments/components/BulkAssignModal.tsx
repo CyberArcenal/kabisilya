@@ -12,27 +12,28 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: { pitakId: number; pitakLocation?: string } | null;
 }
 
-const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
+const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
   const defaultSessionId = useDefaultSessionId();
   const [workerIds, setWorkerIds] = useState<number[]>([]);
   const [currentWorkerId, setCurrentWorkerId] = useState<number | null>(null);
-  const [pitakId, setPitakId] = useState<number>(0);
+  const [pitakId, setPitakId] = useState<number>(initialData?.pitakId || 0);
   const [assignmentDate, setAssignmentDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset form when modal opens
+  // Reset form when modal opens or initialData changes
   useEffect(() => {
     if (isOpen) {
       setWorkerIds([]);
       setCurrentWorkerId(null);
-      setPitakId(0);
+      setPitakId(initialData?.pitakId || 0);
       setAssignmentDate(new Date().toISOString().split("T")[0]);
       setNotes("");
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const addWorker = () => {
     if (currentWorkerId && !workerIds.includes(currentWorkerId)) {
@@ -78,6 +79,8 @@ const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
+  const isPlotLocked = !!(initialData?.pitakId);
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Bulk Assign Workers" size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -115,7 +118,13 @@ const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
             value={pitakId}
             onChange={(id) => setPitakId(id || 0)}
             placeholder="Select plot"
+            disabled={isPlotLocked}
           />
+          {isPlotLocked && initialData?.pitakLocation && (
+            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+              Assigning workers to plot: <strong>{initialData.pitakLocation}</strong>
+            </p>
+          )}
         </div>
 
         <div>

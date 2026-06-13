@@ -247,17 +247,18 @@ export const usePitaks = () => {
     viewModal.open();
   };
 
-  const handleEdit = (pitak: PitakWithWorkers) => {
-    setEditingPitak({
-      id: pitak.id,
-      bukidId: pitak.bukid?.id || 0,
-      location: pitak.location || "",
-      area: pitak.area,
-      description: pitak.description || "",
-      status: pitak.status,
-    });
-    formModal.open();
-  };
+const handleEdit = (pitak: PitakWithWorkers) => {
+  setEditingPitak({
+    id: pitak.id,
+    bukidId: pitak.bukid?.id || 0,
+    location: pitak.location || "",
+    area: pitak.area,                     // keep for backward compatibility
+    totalLuwang: pitak.totalLuwang,       // ✅ add this line
+    description: pitak.description || "",
+    status: pitak.status,
+  });
+  formModal.open();
+};
 
   const handleAddNew = () => {
     setEditingPitak(null);
@@ -311,5 +312,6 @@ export const usePitaks = () => {
     handleAddNew,
     handleFormSuccess,
     resetFilters,
+    refetch: fetchPitaks,
   };
 };

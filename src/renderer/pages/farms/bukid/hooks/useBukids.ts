@@ -142,6 +142,7 @@ export const useBukids = () => {
 
   // Fetch data
   const fetchBukids = useCallback(async () => {
+    // Cancel previous request
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -168,7 +169,7 @@ export const useBukids = () => {
       setTotalCount(bukidRes.data.pagination.total);
       setTotalPages(bukidRes.data.pagination.pages);
 
-      // Fetch pitaks
+      // Fetch pitaks for plots column and area calculation
       const pitakRes = await pitakAPI.getAll({ limit: 1000 });
       if (controller.signal.aborted || !isMountedRef.current) return;
 
@@ -183,10 +184,29 @@ export const useBukids = () => {
         });
       }
 
-      const enriched = bukidList.map((b) => ({
-        ...b,
-        pitaks: pitaksByBukid.get(b.id) || [],
-      }));
+      // Constants for conversion
+      const LUWANG_PER_HECTARE = 20; // 1 hectare = 20 luwang
+      const SQM_PER_LUWANG = 500; // 1 luwang = 500 square meters (10,000 / 20)
+
+      // Enrich bukids with pitaks and calculate total area (hectares)
+      // Inside fetchBukids, after getting pitaksByBukid
+      const enriched = bukidList.map((b) => {
+        const pitaksForBukid = pitaksByBukid.get(b.id) || [];
+
+        // Sum totalLuwang from all pitaks
+        const totalLuwang = pitaksForBukid.reduce((sum, pitak) => {
+          return (
+            sum +
+            (typeof pitak.totalLuwang === "number" ? pitak.totalLuwang : 0)
+          );
+        }, 0);
+
+        return {
+          ...b,
+          pitaks: pitaksForBukid,
+          area: totalLuwang > 0 ? totalLuwang : (b.area ?? undefined), // area now stores luwang
+        };
+      });
 
       if (!controller.signal.aborted && isMountedRef.current) {
         setBukids(enriched);
@@ -198,7 +218,6 @@ export const useBukids = () => {
       if (isMountedRef.current && !controller.signal.aborted) {
         setLoading(false);
       }
-      isUpdatingFromUrlRef.current = false;
     }
   }, [page, search, status]);
 
@@ -288,5 +307,6 @@ export const useBukids = () => {
     handleChangeStatus,
     handleConfirmStatusChange,
     resetFilters,
+    refetch: fetchBukids,
   };
 };

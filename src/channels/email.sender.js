@@ -1,4 +1,5 @@
 // src/channels/email.sender.js
+//@ts-check
 const nodemailer = require("nodemailer");
 const PQueue = require("p-queue").default;
 const NotificationLog = require("../entities/NotificationLog");
@@ -156,7 +157,7 @@ async send(to, subject, html, text, options = {}, asyncMode = true, logId = null
       smtpPassword,
       companyName,
       smtpFromEmail,
-    } = require("../utils/system");
+    } = require("../utils/settings/system");
 
     if (!(await emailEnabled())) {
       throw new Error("Email notifications are disabled");
