@@ -8,7 +8,7 @@ module.exports = async (params, queryRunner) => {
     if (!id) throw new Error("Bukid ID is required");
     if (!status) throw new Error("New status is required");
 
-    const updated = await bukidService.updateStatus(id, status, userId || "system");
+    const updated = await bukidService.updateStatus(id, status, userId || "system", queryRunner);
     return {
       status: true,
       message: "Bukid status updated successfully",

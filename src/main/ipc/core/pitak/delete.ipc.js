@@ -7,7 +7,7 @@ module.exports = async function deletePitak(params, queryRunner) {
   try {
     logger.info("IPC: deletePitak", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await pitakService.delete(params.id, "system");
+    const result = await pitakService.delete(params.id, "system", queryRunner);
     return { status: true, message: "Pitak archived", data: result };
   } catch (error) {
     logger.error("IPC: deletePitak error:", error);

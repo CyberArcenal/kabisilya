@@ -1,13 +1,15 @@
 // src/renderer/pages/farms/assignments/components/AssignmentTable.tsx
 import React from "react";
-import { Eye, Edit, Trash2, Calendar } from "lucide-react";
+import { Calendar } from "lucide-react";
 import type { AssignmentWithDetails } from "../types";
+import AssignmentActionsDropdown from "./AssignmentActionsDropdown";
 
 interface AssignmentTableProps {
   assignments: AssignmentWithDetails[];
   onView: (assignment: AssignmentWithDetails) => void;
   onEdit: (assignment: AssignmentWithDetails) => void;
   onDelete: (id: number) => void;
+  onChangeStatus: (assignment: AssignmentWithDetails) => void;
 }
 
 const getInitials = (name: string) => {
@@ -40,9 +42,9 @@ const AssignmentTable: React.FC<AssignmentTableProps> = ({
   onView,
   onEdit,
   onDelete,
+  onChangeStatus,
 }) => {
-  console.log(assignments)
-  if (assignments?.length === 0) {
+  if (!assignments?.length) {
     return (
       <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">
         No assignments found
@@ -98,17 +100,13 @@ const AssignmentTable: React.FC<AssignmentTableProps> = ({
                 <StatusBadge status={assignment.status} />
               </td>
               <td className="py-2.5 px-4">
-                <div className="flex gap-2">
-                  <button onClick={() => onView(assignment)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="View">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onEdit(assignment)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="Edit">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onDelete(assignment.id)} className="p-1 rounded hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <AssignmentActionsDropdown
+                  assignment={assignment}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onChangeStatus={onChangeStatus}
+                />
               </td>
             </tr>
           ))}

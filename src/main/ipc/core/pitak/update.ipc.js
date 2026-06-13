@@ -7,7 +7,7 @@ module.exports = async function updatePitak(params, queryRunner) {
   try {
     logger.info("IPC: updatePitak", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await pitakService.update(params.id, params, "system");
+    const result = await pitakService.update(params.id, params, "system", queryRunner);
     return { status: true, message: "Pitak updated", data: result };
   } catch (error) {
     logger.error("IPC: updatePitak error:", error);

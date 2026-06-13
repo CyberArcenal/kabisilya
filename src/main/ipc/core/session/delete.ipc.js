@@ -7,7 +7,7 @@ module.exports = async function deleteSession(params, queryRunner) {
   try {
     logger.info("IPC: deleteSession", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await sessionService.delete(params.id, "system");
+    const result = await sessionService.delete(params.id, "system", queryRunner);
     return { status: true, message: "Session archived", data: result };
   } catch (error) {
     logger.error("IPC: deleteSession error:", error);

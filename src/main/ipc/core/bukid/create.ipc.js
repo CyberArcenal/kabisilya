@@ -11,7 +11,7 @@ module.exports = async function createBukid(params, queryRunner) {
     if (!params.name || !params.sessionId) {
       return { status: false, message: "Missing required fields: name, sessionId", data: null };
     }
-    const result = await bukidService.create(params, "system");
+    const result = await bukidService.create(params, "system", queryRunner);
     return { status: true, message: "Bukid created successfully", data: result };
   } catch (error) {
     // @ts-ignore

@@ -1,9 +1,10 @@
-// src/layouts/components/TopBarLeft.tsx
+// src/layouts/components/TopBarLeft.tsx (simplified)
 import React, { useState, useEffect } from "react";
 import { Menu, CalendarDays, AlertCircle, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDefaultSessionId } from "../../../utils/config/farmConfig";
 import sessionAPI, { type Session } from "../../../api/core/session";
+import SessionSelectorModal from "../../../components/Modals/SessionSelectorModal";
 
 interface TopBarLeftProps {
   toggleSidebar: () => void;
@@ -14,6 +15,7 @@ const TopBarLeft: React.FC<TopBarLeftProps> = ({ toggleSidebar }) => {
   const defaultSessionId = useDefaultSessionId();
   const [sessionDetails, setSessionDetails] = useState<Session | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -59,18 +61,25 @@ const TopBarLeft: React.FC<TopBarLeftProps> = ({ toggleSidebar }) => {
     weekday: "short", month: "short", day: "numeric",
   });
 
+  const handleSessionClick = () => setIsModalOpen(true);
+  const handleModalClose = () => setIsModalOpen(false);
+
   return (
     <div className="flex items-center gap-4">
-      {/* Menu button */}
+      {/* Hamburger menu */}
       <button
         onClick={toggleSidebar}
-        className="p-2 rounded-xl hover:bg-[var(--card-hover-bg)] text-[var(--sidebar-text)] transition-all duration-200 md:hidden"
+        className="p-2 rounded-xl hover:bg-[var(--card-hover-bg)] text-[var(--sidebar-text)] transition-all duration-200"
+        aria-label="Toggle sidebar"
       >
         <Menu className="w-5 h-5" />
       </button>
 
-      {/* Session info (desktop) */}
-      <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg bg-[rgba(46,125,50,0.1)] border border-[var(--border-color)] min-w-[220px]">
+      {/* Session info */}
+      <div
+        className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg bg-[rgba(46,125,50,0.1)] border border-[var(--border-color)] min-w-[220px] cursor-pointer hover:bg-[rgba(46,125,50,0.2)] transition-colors"
+        onClick={handleSessionClick}
+      >
         <CalendarDays className="w-4 h-4 text-[var(--accent-green)]" />
         <div className="min-w-0">
           {sessionLoading ? (
@@ -101,10 +110,7 @@ const TopBarLeft: React.FC<TopBarLeftProps> = ({ toggleSidebar }) => {
                 <AlertCircle className="w-3 h-3 text-[var(--accent-red)]" />
                 <span className="text-xs font-medium text-[var(--text-primary)]">No Active Session</span>
               </div>
-              <div
-                className="text-xs cursor-pointer hover:underline text-[var(--accent-green)]"
-                onClick={() => navigate("/system/sessions")}
-              >
+              <div className="text-xs text-[var(--accent-green)]">
                 Click to set default session
               </div>
             </div>
@@ -112,7 +118,7 @@ const TopBarLeft: React.FC<TopBarLeftProps> = ({ toggleSidebar }) => {
         </div>
       </div>
 
-      {/* Date display (desktop) */}
+      {/* Date display */}
       <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-[rgba(46,125,50,0.1)] border border-[var(--border-color)]">
         <Calendar className="w-4 h-4 text-[var(--accent-green)]" />
         <div className="flex flex-col">
@@ -122,6 +128,11 @@ const TopBarLeft: React.FC<TopBarLeftProps> = ({ toggleSidebar }) => {
           <div className="text-xs text-[var(--text-secondary)]">{formattedDate}</div>
         </div>
       </div>
+
+      <SessionSelectorModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+      />
     </div>
   );
 };

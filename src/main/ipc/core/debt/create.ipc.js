@@ -9,7 +9,7 @@ module.exports = async function createDebt(params, queryRunner) {
     if (!params.workerId || !params.sessionId || params.amount === undefined) {
       return { status: false, message: "Missing required fields: workerId, sessionId, amount", data: null };
     }
-    const result = await debtService.create(params, "system");
+    const result = await debtService.create(params, "system", queryRunner);
     return { status: true, message: "Debt created successfully", data: result };
   } catch (error) {
     logger.error("IPC: createDebt error:", error);

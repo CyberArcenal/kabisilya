@@ -5,8 +5,11 @@ import type { Worker } from "../../../../api/core/worker";
 
 interface WorkerAvatarStackProps {
   workers: Worker[];
+  pitakId: number;
+  pitakLocation?: string;
   maxDisplay?: number;
   onWorkerClick?: (worker: Worker) => void;
+  onViewAllWorkers?: (pitakId: number) => void; // navigate to assignments filtered by pitak
 }
 
 const getInitials = (name: string) => {
@@ -20,8 +23,11 @@ const getInitials = (name: string) => {
 
 const WorkerAvatarStack: React.FC<WorkerAvatarStackProps> = ({
   workers,
+  pitakId,
+  pitakLocation,
   maxDisplay = 3,
   onWorkerClick,
+  onViewAllWorkers,
 }) => {
   const [hoveredWorker, setHoveredWorker] = useState<Worker | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
@@ -40,6 +46,10 @@ const WorkerAvatarStack: React.FC<WorkerAvatarStackProps> = ({
 
   const handleMouseLeave = () => {
     setHoveredWorker(null);
+  };
+
+  const handleViewAll = () => {
+    if (onViewAllWorkers) onViewAllWorkers(pitakId);
   };
 
   return (
@@ -62,12 +72,13 @@ const WorkerAvatarStack: React.FC<WorkerAvatarStackProps> = ({
           </div>
         ))}
         {remaining > 0 && (
-          <div
-            className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 ring-2 ring-white dark:ring-gray-800 cursor-help"
-            title={`${remaining} more workers`}
+          <button
+            onClick={handleViewAll}
+            className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 ring-2 ring-white dark:ring-gray-800 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors cursor-pointer"
+            title={`View all ${workers.length} workers assigned to this plot`}
           >
             +{remaining}
-          </div>
+          </button>
         )}
       </div>
 

@@ -7,7 +7,7 @@ module.exports = async (params, queryRunner) => {
     if (!id) throw new Error("Session ID is required");
     if (!status) throw new Error("New status is required");
 
-    const updated = await sessionService.updateStatus(id, status, userId || "system");
+    const updated = await sessionService.updateStatus(id, status, userId || "system", queryRunner);
     return {
       status: true,
       message: "Session status updated successfully",

@@ -1,4 +1,9 @@
 // src/main/ipc/paymentHistory/get/all.ipc.js
+//@ts-check
+
+const paymentHistoryService = require("../../../../../services/PaymentHistoryService");
+const { logger } = require("../../../../../utils/logger");
+
 module.exports = async function getAllPaymentHistories(params) {
   try {
     logger.info("IPC: getAllPaymentHistories", { params });

@@ -18,6 +18,13 @@ import NotificationsPage from "../pages/notifications";
 import NotificationLogsPage from "../pages/notification-logs";
 import AuditPage from "../pages/audit";
 import FarmManagementSettingsPage from "../pages/settings";
+import PaymentHistoryPage from "../pages/finance/payment-history";
+import DebtHistoryPage from "../pages/finance/debt-history";
+import BukidReportsPage from "../pages/reports/bukid";
+import FinancialReportsPage from "../pages/reports/financial";
+import PitakProductivityPage from "../pages/reports/pitak";
+import WorkerPerformancePage from "../pages/reports/workers";
+import SessionsPage from "../pages/system/sessions";
 
 function App() {
   const [licenseAccepted, setLicenseAccepted] = useState(false);
@@ -71,17 +78,36 @@ function App() {
         <Route path="/workers" element={<WorkersPage />} />
 
         {/* Payroll & Finance */}
-        <Route path="/finance/worker/payments" element={<WorkerPaymentsPage />} />
+        <Route
+          path="/finance/worker/payments"
+          element={<WorkerPaymentsPage />}
+        />
         <Route path="/finance/payments" element={<WorkerPaymentsPage />} />
         <Route path="/finance/debts" element={<DebtsPage />} />
+        <Route
+          path="/finance/payment/history"
+          element={<PaymentHistoryPage />}
+        />
+        <Route path="/finance/debt/history" element={<DebtHistoryPage />} />
 
+        <Route path="/analytics/bukid" element={<BukidReportsPage />} />
+        <Route path="/analytics/finance" element={<FinancialReportsPage />} />
+        <Route path="/analytics/pitak" element={<PitakProductivityPage />} />
+        <Route path="/analytics/workers" element={<WorkerPerformancePage />} />
+
+        <Route path="/system/sessions" element={<SessionsPage/>}/>
+
+        
         {/* Notifications & Logs */}
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/notification-logs" element={<NotificationLogsPage />} />
 
         {/* System */}
         <Route path="/audit" element={<AuditPage />} />
-        <Route path="/system/settings" element={<FarmManagementSettingsPage />} />
+        <Route
+          path="/system/settings"
+          element={<FarmManagementSettingsPage />}
+        />
 
         {/* 404 */}
         <Route path="*" element={<PageNotFound />} />

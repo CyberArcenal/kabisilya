@@ -8,7 +8,7 @@ module.exports = async function createPayment(params, queryRunner) {
     if (!params.workerId || !params.pitakId || !params.sessionId) {
       return { status: false, message: "Missing required fields: workerId, pitakId, sessionId", data: null };
     }
-    const result = await paymentService.create(params, "system");
+    const result = await paymentService.create(params, "system", queryRunner);
     return { status: true, message: "Payment created", data: result };
   } catch (error) {
     logger.error("IPC: createPayment error:", error);

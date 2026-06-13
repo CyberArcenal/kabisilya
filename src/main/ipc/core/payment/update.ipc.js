@@ -6,7 +6,7 @@ module.exports = async function updatePayment(params, queryRunner) {
   try {
     logger.info("IPC: updatePayment", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await paymentService.update(params.id, params, "system");
+    const result = await paymentService.update(params.id, params, "system", queryRunner);
     return { status: true, message: "Payment updated", data: result };
   } catch (error) {
     logger.error("IPC: updatePayment error:", error);

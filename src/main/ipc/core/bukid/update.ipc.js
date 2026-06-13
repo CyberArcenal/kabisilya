@@ -9,7 +9,7 @@ module.exports = async function updateBukid(params, queryRunner) {
     // @ts-ignore
     logger.info("IPC: updateBukid", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await bukidService.update(params.id, params, "system");
+    const result = await bukidService.update(params.id, params, "system", queryRunner);
     return { status: true, message: "Bukid updated successfully", data: result };
   } catch (error) {
     // @ts-ignore

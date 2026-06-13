@@ -1,11 +1,11 @@
 // src/renderer/pages/dashboard/hooks/useDashboardData.ts
 import { useState, useEffect } from "react";
+import type { DashboardData } from "../types";
 import workerAPI from "../../../api/core/worker";
 import assignmentAPI from "../../../api/core/assignment";
 import paymentAPI from "../../../api/core/payment";
 import debtAPI from "../../../api/core/debt";
 import sessionAPI from "../../../api/core/session";
-import type { DashboardData } from "../types";
 import auditLogAPI from "../../../api/core/audit";
 
 const getCurrentMonthRange = () => {
@@ -70,7 +70,7 @@ export const useDashboardData = () => {
           })(),
           debtAPI.getStats(),
           sessionAPI.getActive(),
-          auditLogAPI.getRecentActivity(5),
+          auditLogAPI.getRecentActivity(10), // Increased to 10 items
         ]);
 
         const totalWorkers = workersRes.status === "fulfilled" && workersRes.value.status
@@ -110,7 +110,7 @@ export const useDashboardData = () => {
         const monthlyAssignments = await fetchMonthlyTotals(
           assignmentAPI.getAll.bind(assignmentAPI),
           months,
-          (items) => items.length // assignments count
+          (items) => items.length
         );
         const assignmentsPerMonth = months.map((m, idx) => ({
           month: new Date(m).toLocaleDateString("en-US", { month: "short", year: "numeric" }),

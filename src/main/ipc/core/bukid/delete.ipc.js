@@ -9,7 +9,7 @@ module.exports = async function deleteBukid(params, queryRunner) {
     // @ts-ignore
     logger.info("IPC: deleteBukid", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await bukidService.delete(params.id, "system");
+    const result = await bukidService.delete(params.id, "system", queryRunner);
     return { status: true, message: "Bukid archived successfully", data: result };
   } catch (error) {
     // @ts-ignore

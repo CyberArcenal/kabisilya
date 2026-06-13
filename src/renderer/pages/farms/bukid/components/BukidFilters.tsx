@@ -11,7 +11,6 @@ interface Props {
 
 const statusOptions = [
   { value: "", label: "All Status" },
-  { value: "initiated", label: "Initiated" },
   { value: "active", label: "Active" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },

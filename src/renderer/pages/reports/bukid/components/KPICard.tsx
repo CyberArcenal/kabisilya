@@ -16,7 +16,7 @@ const KPICard: React.FC<Props> = ({ title, value, icon, color, change }) => {
       <div className="flex justify-between items-start">
         <div>
           <p className="text-sm font-medium text-[var(--text-secondary)]">{title}</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{value}</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{Number(value).toFixed(0)}</p>
           {change !== undefined && (
             <div className={`flex items-center gap-1 text-xs mt-1 ${change >= 0 ? "text-green-500" : "text-red-500"}`}>
               {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}

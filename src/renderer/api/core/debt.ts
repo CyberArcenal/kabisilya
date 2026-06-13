@@ -197,6 +197,19 @@ class DebtAPI {
       throw new Error(error.message || "Failed to restore debt");
     }
   }
+
+  async payDebt(id: number, amount: number, notes?: string): Promise<DebtResponse> {
+  try {
+    if (!id || id <= 0) throw new Error("Invalid ID");
+    if (!amount || amount <= 0) throw new Error("Invalid payment amount");
+    const response = await this.call<DebtResponse>("payDebt", { id, amount, notes });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to record payment");
+  } catch (error: any) {
+    throw new Error(error.message || "Failed to record payment");
+  }
+}
+
 }
 
 const debtAPI = new DebtAPI();

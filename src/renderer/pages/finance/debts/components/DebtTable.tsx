@@ -1,17 +1,19 @@
 // src/renderer/pages/finance/debts/components/DebtTable.tsx
 import React from "react";
-import { Eye, Edit, Trash2, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import type { DebtWithDetails } from "../types";
+import DebtActionsDropdown from "./DebtActionsDropdown";
 
 interface DebtTableProps {
   debts: DebtWithDetails[];
   onView: (debt: DebtWithDetails) => void;
   onEdit: (debt: DebtWithDetails) => void;
   onDelete: (id: number) => void;
+  onChangeStatus: (debt: DebtWithDetails) => void;
+  onRecordPayment: (debt: DebtWithDetails) => void;
 }
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(amount);
+const formatCurrency = (amount: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(amount);
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   pending: { bg: "#fef3c7", text: "#92400e" },
@@ -24,11 +26,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const colors = statusColors[status] || { bg: "#f3f4f6", text: "#6b7280" };
-  return (
-    <span className="px-2 py-1 text-xs rounded-full" style={{ backgroundColor: colors.bg, color: colors.text }}>
-      {status}
-    </span>
-  );
+  return <span className="px-2 py-1 text-xs rounded-full" style={{ backgroundColor: colors.bg, color: colors.text }}>{status}</span>;
 };
 
 const getProgressPercent = (balance: number, originalAmount: number) => {
@@ -37,22 +35,10 @@ const getProgressPercent = (balance: number, originalAmount: number) => {
   return (paid / originalAmount) * 100;
 };
 
-const DebtTable: React.FC<DebtTableProps> = ({
-  debts,
-  onView,
-  onEdit,
-  onDelete,
-}) => {
-  if (debts.length === 0) {
-    return (
-      <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">
-        No debts found
-      </div>
-    );
-  }
+const DebtTable: React.FC<DebtTableProps> = ({ debts, onView, onEdit, onDelete, onChangeStatus, onRecordPayment }) => {
+  if (debts.length === 0) return <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">No debts found</div>;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0,0,0,0);
 
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)]">
@@ -69,55 +55,25 @@ const DebtTable: React.FC<DebtTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {debts.map((debt) => {
+          {debts.map(debt => {
             const dueDate = debt.dueDate ? new Date(debt.dueDate) : null;
             const isOverdue = dueDate && dueDate < today && debt.balance > 0 && debt.status !== "paid" && debt.status !== "cancelled" && debt.status !== "settled";
             const progress = getProgressPercent(debt.balance, debt.amount);
-
             return (
-              <tr
-                key={debt.id}
-                className={`border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors ${isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""}`}
-              >
-                <td className="py-2.5 px-4 font-medium text-[var(--text-primary)]">
-                  {debt.worker?.name || "—"}
-                  {isOverdue && <AlertCircle className="inline ml-2 w-4 h-4 text-red-500"/>}
-                </td>
-                <td className="py-2.5 px-4 text-right text-[var(--text-secondary)]">
-                  {formatCurrency(debt.amount)}
-                </td>
+              <tr key={debt.id} className={`border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors ${isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""}`}>
+                <td className="py-2.5 px-4 font-medium text-[var(--text-primary)]">{debt.worker?.name || "—"}{isOverdue && <AlertCircle className="inline ml-2 w-4 h-4 text-red-500"/>}</td>
+                <td className="py-2.5 px-4 text-right text-[var(--text-secondary)]">{formatCurrency(debt.amount)}</td>
                 <td className="py-2.5 px-4">
                   <div className="flex flex-col">
                     <span className="text-right text-[var(--text-secondary)]">{formatCurrency(debt.balance)}</span>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                      <div
-                        className="bg-[var(--accent-green)] h-1.5 rounded-full"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1"><div className="bg-[var(--accent-green)] h-1.5 rounded-full" style={{ width: `${progress}%` }} /></div>
                   </div>
                 </td>
-                <td className="py-2.5 px-4 text-[var(--text-secondary)]">
-                  {dueDate ? dueDate.toLocaleDateString() : "—"}
-                </td>
+                <td className="py-2.5 px-4 text-[var(--text-secondary)]">{dueDate ? dueDate.toLocaleDateString() : "—"}</td>
+                <td className="py-2.5 px-4"><StatusBadge status={debt.status} /></td>
+                <td className="py-2.5 px-4 text-right text-[var(--text-secondary)]">{debt.interestRate}%</td>
                 <td className="py-2.5 px-4">
-                  <StatusBadge status={debt.status} />
-                </td>
-                <td className="py-2.5 px-4 text-right text-[var(--text-secondary)]">
-                  {debt.interestRate}%
-                </td>
-                <td className="py-2.5 px-4">
-                  <div className="flex gap-2">
-                    <button onClick={() => onView(debt)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="View">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => onEdit(debt)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="Edit">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => onDelete(debt.id)} className="p-1 rounded hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500" title="Delete">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <DebtActionsDropdown debt={debt} onView={onView} onEdit={onEdit} onDelete={onDelete} onChangeStatus={onChangeStatus} onRecordPayment={onRecordPayment} />
                 </td>
               </tr>
             );

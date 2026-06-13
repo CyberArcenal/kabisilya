@@ -9,6 +9,8 @@ import { useDebts } from "./hooks/useDebts";
 import DebtTable from "./components/DebtTable";
 import CreateDebtModal from "./components/CreateDebtModal";
 import ViewDebtModal from "./components/ViewDebtModal";
+import ChangeDebtStatusModal from "./components/ChangeDebtStatusModal";
+import RecordPaymentModal from "./components/RecordPaymentModal";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -32,6 +34,12 @@ const DebtManagementPage: React.FC = () => {
     editingDebt,
     viewModal,
     formModal,
+    statusChangeDebt,
+    statusModal,
+    paymentDebt,
+    paymentModal,
+    handleRecordPayment,
+    handleConfirmPayment,
     setPage,
     setSearch,
     setWorkerId,
@@ -45,18 +53,32 @@ const DebtManagementPage: React.FC = () => {
     handleEdit,
     handleAddNew,
     handleFormSuccess,
+    handleChangeStatus,
+    handleConfirmStatusChange,
     resetFilters,
   } = useDebts();
 
-  const hasFilters = !!(filters.search || filters.workerId || filters.status || filters.dueDateStart || filters.dueDateEnd || filters.minAmount !== undefined || filters.maxAmount !== undefined);
+  const hasFilters = !!(
+    filters.search ||
+    filters.workerId ||
+    filters.status ||
+    filters.dueDateStart ||
+    filters.dueDateEnd ||
+    filters.minAmount !== undefined ||
+    filters.maxAmount !== undefined
+  );
 
   return (
     <div className="p-6 space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Debt Management</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Manage worker debts and collections</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Debt Management
+          </h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Manage worker debts and collections
+          </p>
         </div>
         <Button variant="primary" size="md" icon={Plus} onClick={handleAddNew}>
           Create Debt
@@ -73,63 +95,115 @@ const DebtManagementPage: React.FC = () => {
             type="text"
             placeholder="Search worker or reason..."
             value={filters.search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           />
           <WorkerSelect
             value={filters.workerId || null}
-            onChange={(id) => { setWorkerId(id || undefined); setPage(1); }}
+            onChange={(id) => {
+              setWorkerId(id || undefined);
+              setPage(1);
+            }}
             placeholder="All workers"
           />
           <select
             value={filters.status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           >
-            {statusOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
           <input
             type="date"
             placeholder="Due date from"
             value={filters.dueDateStart}
-            onChange={(e) => { setDueDateStart(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setDueDateStart(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           />
           <input
             type="date"
             placeholder="Due date to"
             value={filters.dueDateEnd}
-            onChange={(e) => { setDueDateEnd(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setDueDateEnd(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           />
           <div className="flex gap-2">
             <input
               type="number"
               placeholder="Min amount"
               value={filters.minAmount ?? ""}
-              onChange={(e) => setMinAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
+              onChange={(e) =>
+                setMinAmount(
+                  e.target.value ? parseFloat(e.target.value) : undefined,
+                )
+              }
               className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-              style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
             />
             <input
               type="number"
               placeholder="Max amount"
               value={filters.maxAmount ?? ""}
-              onChange={(e) => setMaxAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
+              onChange={(e) =>
+                setMaxAmount(
+                  e.target.value ? parseFloat(e.target.value) : undefined,
+                )
+              }
               className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-              style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
             />
           </div>
         </div>
         {hasFilters && (
           <div className="flex justify-end">
-            <button onClick={resetFilters} className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1">
+            <button
+              onClick={resetFilters}
+              className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1"
+            >
               <X className="w-3 h-3" /> Clear all filters
             </button>
           </div>
@@ -148,10 +222,16 @@ const DebtManagementPage: React.FC = () => {
             onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onChangeStatus={handleChangeStatus}
+            onRecordPayment={handleRecordPayment}
           />
-          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
           <div className="text-xs text-[var(--text-tertiary)] text-right">
-            Total: {totalCount} debt{totalCount !== 1 ? 's' : ''}
+            Total: {totalCount} debt{totalCount !== 1 ? "s" : ""}
           </div>
         </>
       )}
@@ -162,11 +242,32 @@ const DebtManagementPage: React.FC = () => {
         onClose={viewModal.close}
         debt={selectedDebt}
       />
-      <CreateDebtModal
-        isOpen={formModal.isOpen}
-        onClose={formModal.close}
-        onSuccess={handleFormSuccess}
-        initialData={editingDebt}
+ <CreateDebtModal
+  key={editingDebt?.id || 'new'}
+  isOpen={formModal.isOpen}
+  onClose={formModal.close}
+  onSuccess={handleFormSuccess}
+  initialData={editingDebt}
+/>
+      <ChangeDebtStatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        debtInfo={
+          statusChangeDebt
+            ? `Debt #${statusChangeDebt.id} - ${statusChangeDebt.worker?.name || "Unknown"}`
+            : ""
+        }
+        currentStatus={statusChangeDebt?.status || ""}
+        onConfirm={handleConfirmStatusChange}
+      />
+      <RecordPaymentModal
+        isOpen={paymentModal.isOpen}
+        onClose={paymentModal.close}
+        debtId={paymentDebt?.id || 0}
+        workerName={paymentDebt?.worker?.name || ""}
+        currentBalance={paymentDebt?.balance || 0}
+        onSuccess={() => {}} // optional, handleConfirmPayment already refreshes
+        onPay={handleConfirmPayment}
       />
     </div>
   );

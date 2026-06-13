@@ -9,7 +9,7 @@ module.exports = async function createSession(params, queryRunner) {
     if (!params.name || !params.year || !params.startDate) {
       return { status: false, message: "Missing required fields: name, year, startDate", data: null };
     }
-    const result = await sessionService.create(params, "system");
+    const result = await sessionService.create(params, "system", queryRunner);
     return { status: true, message: "Session created", data: result };
   } catch (error) {
     logger.error("IPC: createSession error:", error);

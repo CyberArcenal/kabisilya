@@ -9,7 +9,7 @@ module.exports = async function createDebtHistory(params, queryRunner) {
     if (!params.debtId) {
       return { status: false, message: "Missing debtId", data: null };
     }
-    const result = await debtHistoryService.create(params, "system");
+    const result = await debtHistoryService.create(params, "system", queryRunner);
     return { status: true, message: "Debt history created", data: result };
   } catch (error) {
     logger.error("IPC: createDebtHistory error:", error);

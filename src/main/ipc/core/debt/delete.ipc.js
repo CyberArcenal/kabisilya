@@ -7,7 +7,7 @@ module.exports = async function deleteDebt(params, queryRunner) {
   try {
     logger.info("IPC: deleteDebt", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await debtService.delete(params.id, "system");
+    const result = await debtService.delete(params.id, "system", queryRunner);
     return { status: true, message: "Debt cancelled successfully", data: result };
   } catch (error) {
     logger.error("IPC: deleteDebt error:", error);

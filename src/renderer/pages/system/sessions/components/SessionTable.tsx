@@ -1,7 +1,8 @@
 // src/renderer/pages/system/sessions/components/SessionTable.tsx
 import React from "react";
-import { Eye, Edit, Trash2, Star, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Star, CheckCircle, XCircle, Clock } from "lucide-react";
 import type { SessionWithDetails } from "../types";
+import SessionActionsDropdown from "./SessionActionsDropdown";
 
 interface SessionTableProps {
   sessions: SessionWithDetails[];
@@ -9,6 +10,7 @@ interface SessionTableProps {
   onEdit: (session: SessionWithDetails) => void;
   onDelete: (id: number) => void;
   onSetActive: (id: number) => void;
+  onChangeStatus: (session: SessionWithDetails) => void;
 }
 
 const statusIcon: Record<string, React.ReactNode> = {
@@ -23,6 +25,7 @@ const SessionTable: React.FC<SessionTableProps> = ({
   onEdit,
   onDelete,
   onSetActive,
+  onChangeStatus,
 }) => {
   if (sessions.length === 0) {
     return <div className="text-center py-8 text-[var(--text-tertiary)]">No sessions found</div>;
@@ -62,22 +65,14 @@ const SessionTable: React.FC<SessionTableProps> = ({
                 </div>
               </td>
               <td className="py-2.5 px-4">
-                <div className="flex gap-2">
-                  {session.status !== "active" && (
-                    <button onClick={() => onSetActive(session.id)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-yellow-500 hover:text-yellow-600" title="Set as active">
-                      <Star className="w-4 h-4" />
-                    </button>
-                  )}
-                  <button onClick={() => onView(session)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="View">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onEdit(session)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="Edit">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onDelete(session.id)} className="p-1 rounded hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <SessionActionsDropdown
+                  session={session}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onSetActive={onSetActive}
+                  onChangeStatus={onChangeStatus}
+                />
               </td>
             </tr>
           ))}

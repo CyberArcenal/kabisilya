@@ -7,7 +7,7 @@ module.exports = async function updateDebt(params, queryRunner) {
   try {
     logger.info("IPC: updateDebt", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await debtService.update(params.id, params, "system");
+    const result = await debtService.update(params.id, params, "system", queryRunner);
     return { status: true, message: "Debt updated successfully", data: result };
   } catch (error) {
     logger.error("IPC: updateDebt error:", error);

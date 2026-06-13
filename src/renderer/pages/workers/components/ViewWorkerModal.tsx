@@ -6,36 +6,40 @@ import type { WorkerWithDetails } from "../types";
 import assignmentAPI from "../../../api/core/assignment";
 import paymentAPI from "../../../api/core/payment";
 import debtAPI from "../../../api/core/debt";
+import workerAPI from "../../../api/core/worker";
 
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  worker: WorkerWithDetails | null;
+  workerId: number | null;
 }
 
 type TabType = "assignments" | "payments" | "debts";
 
-const ViewWorkerModal: React.FC<Props> = ({ isOpen, onClose, worker }) => {
+const ViewWorkerModal: React.FC<Props> = ({ isOpen, onClose, workerId }) => {
   const [activeTab, setActiveTab] = useState<TabType>("assignments");
   const [loading, setLoading] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [debts, setDebts] = useState<any[]>([]);
+  const [worker, setWorker] = useState<WorkerWithDetails>()
 
   React.useEffect(() => {
-    if (!worker || !isOpen) return;
+    if (!workerId || !isOpen) return;
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [assignmentsRes, paymentsRes, debtsRes] = await Promise.all([
-          assignmentAPI.getAll({ workerId: worker.id, limit: 100 }),
-          paymentAPI.getAll({ workerId: worker.id, limit: 100 }),
-          debtAPI.getAll({ workerId: worker.id, limit: 100 }),
+        const [assignmentsRes, paymentsRes, debtsRes, worker] = await Promise.all([
+          assignmentAPI.getAll({ workerId: workerId, limit: 100 }),
+          paymentAPI.getAll({ workerId: workerId, limit: 100 }),
+          debtAPI.getAll({ workerId: workerId, limit: 100 }),
+          workerAPI.getById(workerId),
         ]);
         if (assignmentsRes.status) setAssignments(assignmentsRes.data.items);
         if (paymentsRes.status) setPayments(paymentsRes.data.items);
         if (debtsRes.status) setDebts(debtsRes.data.items);
+        if (worker?.status) setWorker(worker?.data);
       } catch (error) {
         console.error("Failed to fetch worker data", error);
       } finally {
@@ -43,9 +47,9 @@ const ViewWorkerModal: React.FC<Props> = ({ isOpen, onClose, worker }) => {
       }
     };
     fetchData();
-  }, [worker, isOpen]);
+  }, [workerId, isOpen]);
 
-  if (!worker) return null;
+  if (!workerId) return null;
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(amount);
@@ -57,27 +61,27 @@ const ViewWorkerModal: React.FC<Props> = ({ isOpen, onClose, worker }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Name</label>
-            <p className="text-[var(--text-primary)] font-medium">{worker.name}</p>
+            <p className="text-[var(--text-primary)] font-medium">{worker?.name}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Status</label>
-            <p className="capitalize">{worker.status}</p>
+            <p className="capitalize">{worker?.status}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Contact</label>
-            <p>{worker.contact || "—"}</p>
+            <p>{worker?.contact || "—"}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Email</label>
-            <p>{worker.email || "—"}</p>
+            <p>{worker?.email || "—"}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Address</label>
-            <p>{worker.address || "—"}</p>
+            <p>{worker?.address || "—"}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Hire Date</label>
-            <p>{worker.hireDate ? new Date(worker.hireDate).toLocaleDateString() : "—"}</p>
+            <p>{worker?.hireDate ? new Date(worker?.hireDate).toLocaleDateString() : "—"}</p>
           </div>
         </div>
 

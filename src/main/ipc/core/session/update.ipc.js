@@ -7,7 +7,7 @@ module.exports = async function updateSession(params, queryRunner) {
   try {
     logger.info("IPC: updateSession", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await sessionService.update(params.id, params, "system");
+    const result = await sessionService.update(params.id, params, "system", queryRunner);
     return { status: true, message: "Session updated", data: result };
   } catch (error) {
     logger.error("IPC: updateSession error:", error);

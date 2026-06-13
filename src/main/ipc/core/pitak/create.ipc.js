@@ -9,7 +9,7 @@ module.exports = async function createPitak(params, queryRunner) {
     if (!params.bukidId) {
       return { status: false, message: "Missing required fields: bukidId, location", data: null };
     }
-    const result = await pitakService.create(params, "system");
+    const result = await pitakService.create(params, "system", queryRunner);
     return { status: true, message: "Pitak created", data: result };
   } catch (error) {
     logger.error("IPC: createPitak error:", error);

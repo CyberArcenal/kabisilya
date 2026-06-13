@@ -7,7 +7,7 @@ module.exports = async (params, queryRunner) => {
     if (!id) throw new Error("Debt ID is required");
     if (!status) throw new Error("New status is required");
 
-    const updated = await debtService.updateStatus(id, status, userId || "system");
+    const updated = await debtService.updateStatus(id, status, userId || "system", queryRunner);
     return {
       status: true,
       message: "Debt status updated successfully",

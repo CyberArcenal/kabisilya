@@ -1,13 +1,15 @@
 // src/renderer/pages/workers/components/WorkerTable.tsx
 import React from "react";
-import { Eye, Edit, Trash2, Phone, Mail } from "lucide-react";
+import { Phone, Mail } from "lucide-react";
 import type { WorkerWithDetails } from "../types";
+import WorkerActionsDropdown from "./WorkerActionsDropdown";
 
 interface WorkerTableProps {
   workers: WorkerWithDetails[];
   onView: (worker: WorkerWithDetails) => void;
   onEdit: (worker: WorkerWithDetails) => void;
   onDelete: (id: number) => void;
+  onChangeStatus: (worker: WorkerWithDetails) => void;
 }
 
 const getInitials = (name: string) => {
@@ -41,6 +43,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   onView,
   onEdit,
   onDelete,
+  onChangeStatus,
 }) => {
   if (workers?.length === 0) {
     return (
@@ -113,17 +116,13 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                 <StatusBadge status={worker.status} />
               </td>
               <td className="py-2.5 px-4">
-                <div className="flex gap-2">
-                  <button onClick={() => onView(worker)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="View">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onEdit(worker)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="Edit">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onDelete(worker.id)} className="p-1 rounded hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <WorkerActionsDropdown
+                  worker={worker}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onChangeStatus={onChangeStatus}
+                />
               </td>
             </tr>
           ))}

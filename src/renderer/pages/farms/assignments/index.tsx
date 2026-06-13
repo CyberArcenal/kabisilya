@@ -12,6 +12,9 @@ import AssignmentTable from "./components/AssignmentTable";
 import CreateAssignmentModal from "./components/CreateAssignmentModal";
 import BulkAssignModal from "./components/BulkAssignModal";
 import type { AssignmentWithDetails } from "./types";
+import ChangeAssignmentStatusModal from "./components/ChangeAssignmentStatusModal";
+import { useModal } from "../../../hooks/useModal";
+import ViewAssignmentModal from "../../../components/Modals/ViewAssignmentModal";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -34,6 +37,10 @@ const AssignmentsPage: React.FC = () => {
     viewModal,
     formModal,
     bulkModal,
+    statusChangeAssignment,
+    statusModal,
+    handleChangeStatus,
+    handleConfirmStatusChange,
     setPage,
     setSearch,
     setWorkerId,
@@ -51,11 +58,22 @@ const AssignmentsPage: React.FC = () => {
     resetFilters,
   } = useAssignments();
 
-  const hasFilters = !!(filters.search || filters.workerId || filters.pitakId || filters.sessionId || filters.status || filters.startDate || filters.endDate);
+  const hasFilters = !!(
+    filters.search ||
+    filters.workerId ||
+    filters.pitakId ||
+    filters.sessionId ||
+    filters.status ||
+    filters.startDate ||
+    filters.endDate
+  );
+
+  const assignmentModal = useModal();
 
   const handleViewAssignment = (assignment: AssignmentWithDetails) => {
     // Simple alert for now; could open a view modal
-    alert(`Assignment details:\nWorker: ${assignment.worker?.name}\nPlot: ${assignment.pitak?.location}\nLuwang: ${assignment.luwangCount}\nDate: ${new Date(assignment.assignmentDate).toLocaleDateString()}\nStatus: ${assignment.status}`);
+    assignmentModal.setSelected(assignment.id);
+    assignmentModal.open();
   };
 
   return (
@@ -63,14 +81,28 @@ const AssignmentsPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Assignments</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Manage worker assignments to plots</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Assignments
+          </h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Manage worker assignments to plots
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="md" icon={Users} onClick={bulkModal.open}>
+          <Button
+            variant="secondary"
+            size="md"
+            icon={Users}
+            onClick={bulkModal.open}
+          >
             Bulk Assign
           </Button>
-          <Button variant="primary" size="md" icon={Plus} onClick={handleAddNew}>
+          <Button
+            variant="primary"
+            size="md"
+            icon={Plus}
+            onClick={handleAddNew}
+          >
             Add Assignment
           </Button>
         </div>
@@ -86,55 +118,97 @@ const AssignmentsPage: React.FC = () => {
             type="text"
             placeholder="Search worker or plot..."
             value={filters.search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           />
           <WorkerSelect
             value={filters.workerId || null}
-            onChange={(id) => { setWorkerId(id || undefined); setPage(1); }}
+            onChange={(id) => {
+              setWorkerId(id || undefined);
+              setPage(1);
+            }}
             placeholder="All workers"
           />
           <PitakSelect
             value={filters.pitakId || null}
-            onChange={(id) => { setPitakId(id || undefined); setPage(1); }}
+            onChange={(id) => {
+              setPitakId(id || undefined);
+              setPage(1);
+            }}
             placeholder="All plots"
           />
           <SessionSelect
             value={filters.sessionId || null}
-            onChange={(id) => { setSessionId(id || undefined); setPage(1); }}
+            onChange={(id) => {
+              setSessionId(id || undefined);
+              setPage(1);
+            }}
             placeholder="All sessions"
           />
           <select
             value={filters.status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           >
-            {statusOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
           <input
             type="date"
             placeholder="Start date"
             value={filters.startDate}
-            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           />
           <input
             type="date"
             placeholder="End date"
             value={filters.endDate}
-            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-primary)' }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--input-border)",
+              color: "var(--text-primary)",
+            }}
           />
         </div>
         {hasFilters && (
           <div className="flex justify-end">
-            <button onClick={resetFilters} className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1">
+            <button
+              onClick={resetFilters}
+              className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1"
+            >
               <X className="w-3 h-3" /> Clear all filters
             </button>
           </div>
@@ -153,10 +227,15 @@ const AssignmentsPage: React.FC = () => {
             onView={handleViewAssignment}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onChangeStatus={handleChangeStatus}
           />
-          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
           <div className="text-xs text-[var(--text-tertiary)] text-right">
-            Total: {totalCount} assignment{totalCount !== 1 ? 's' : ''}
+            Total: {totalCount} assignment{totalCount !== 1 ? "s" : ""}
           </div>
         </>
       )}
@@ -172,6 +251,26 @@ const AssignmentsPage: React.FC = () => {
         isOpen={bulkModal.isOpen}
         onClose={bulkModal.close}
         onSuccess={handleBulkSuccess}
+      />
+      <ChangeAssignmentStatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        assignmentInfo={
+          statusChangeAssignment
+            ? `${statusChangeAssignment.worker?.name || "Unknown"} on ${statusChangeAssignment.pitak?.location || "Unknown Plot"}`
+            : ""
+        }
+        currentStatus={statusChangeAssignment?.status || ""}
+        onConfirm={handleConfirmStatusChange}
+      />
+      <ViewAssignmentModal
+        isOpen={assignmentModal.isOpen}
+        onClose={() => {
+          assignmentModal.close();
+        }}
+        assignmentId={
+          assignmentModal.selectedId ? assignmentModal.selectedId : null
+        }
       />
     </div>
   );

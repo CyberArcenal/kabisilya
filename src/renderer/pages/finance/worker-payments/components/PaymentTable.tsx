@@ -1,13 +1,15 @@
 // src/renderer/pages/finance/worker-payments/components/PaymentTable.tsx
 import React from "react";
-import { Eye, Edit, Trash2, Calendar } from "lucide-react";
+import { Calendar } from "lucide-react";
 import type { PaymentWithDetails } from "../types";
+import PaymentActionsDropdown from "./PaymentActionsDropdown";
 
 interface PaymentTableProps {
   payments: PaymentWithDetails[];
   onView: (payment: PaymentWithDetails) => void;
   onEdit: (payment: PaymentWithDetails) => void;
   onDelete: (id: number) => void;
+  onChangeStatus: (payment: PaymentWithDetails) => void;
 }
 
 const formatCurrency = (amount: number) =>
@@ -34,6 +36,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   onView,
   onEdit,
   onDelete,
+  onChangeStatus,
 }) => {
   if (payments.length === 0) {
     return (
@@ -93,17 +96,13 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 <StatusBadge status={payment.status} />
               </td>
               <td className="py-2.5 px-4">
-                <div className="flex gap-2">
-                  <button onClick={() => onView(payment)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="View">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onEdit(payment)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="Edit">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onDelete(payment.id)} className="p-1 rounded hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <PaymentActionsDropdown
+                  payment={payment}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onChangeStatus={onChangeStatus}
+                />
               </td>
             </tr>
           ))}

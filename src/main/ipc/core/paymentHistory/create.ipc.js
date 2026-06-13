@@ -9,7 +9,7 @@ module.exports = async function createPaymentHistory(params, queryRunner) {
     if (!params.paymentId) {
       return { status: false, message: "Missing paymentId", data: null };
     }
-    const result = await paymentHistoryService.create(params, "system");
+    const result = await paymentHistoryService.create(params, "system", queryRunner);
     return { status: true, message: "Payment history created", data: result };
   } catch (error) {
     logger.error("IPC: createPaymentHistory error:", error);

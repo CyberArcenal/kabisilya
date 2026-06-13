@@ -9,7 +9,7 @@ module.exports = async function createWorker(params, queryRunner) {
     if (!params.name) {
       return { status: false, message: "Missing required field: name", data: null };
     }
-    const result = await workerService.create(params, "system");
+    const result = await workerService.create(params, "system", queryRunner);
     return { status: true, message: "Worker created", data: result };
   } catch (error) {
     logger.error("IPC: createWorker error:", error);

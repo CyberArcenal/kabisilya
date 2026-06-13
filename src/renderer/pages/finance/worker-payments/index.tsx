@@ -10,6 +10,7 @@ import { usePayments } from "./hooks/usePayments";
 import PaymentTable from "./components/PaymentTable";
 import CreatePaymentModal from "./components/CreatePaymentModal";
 import ViewPaymentModal from "./components/ViewPaymentModal";
+import ChangePaymentStatusModal from "./components/ChangePaymentStatusModal";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -31,6 +32,8 @@ const WorkerPaymentsPage: React.FC = () => {
     editingPayment,
     viewModal,
     formModal,
+    statusChangePayment,
+    statusModal,
     setPage,
     setSearch,
     setWorkerId,
@@ -43,6 +46,8 @@ const WorkerPaymentsPage: React.FC = () => {
     handleEdit,
     handleAddNew,
     handleFormSuccess,
+    handleChangeStatus,
+    handleConfirmStatusChange,
     resetFilters,
   } = usePayments();
 
@@ -133,6 +138,7 @@ const WorkerPaymentsPage: React.FC = () => {
             onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onChangeStatus={handleChangeStatus}
           />
           <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           <div className="text-xs text-[var(--text-tertiary)] text-right">
@@ -152,6 +158,17 @@ const WorkerPaymentsPage: React.FC = () => {
         onClose={formModal.close}
         onSuccess={handleFormSuccess}
         initialData={editingPayment}
+      />
+      <ChangePaymentStatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        paymentInfo={
+          statusChangePayment
+            ? `Payment #${statusChangePayment.id} - ${statusChangePayment.worker?.name || "Unknown"}`
+            : ""
+        }
+        currentStatus={statusChangePayment?.status || ""}
+        onConfirm={handleConfirmStatusChange}
       />
     </div>
   );

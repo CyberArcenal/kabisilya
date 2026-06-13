@@ -7,7 +7,7 @@ module.exports = async function deletePaymentHistory(params, queryRunner) {
   try {
     logger.info("IPC: deletePaymentHistory", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await paymentHistoryService.delete(params.id, "system");
+    const result = await paymentHistoryService.delete(params.id, "system", queryRunner);
     return { status: true, message: "Payment history deleted", data: result };
   } catch (error) {
     logger.error("IPC: deletePaymentHistory error:", error);

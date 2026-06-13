@@ -8,6 +8,7 @@ import { useSessions } from "./hooks/useSessions";
 import SessionTable from "./components/SessionTable";
 import CreateSessionModal from "./components/CreateSessionModal";
 import ViewSessionModal from "./components/ViewSessionModal";
+import ChangeSessionStatusModal from "./components/ChangeSessionStatusModal";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -29,6 +30,8 @@ const SessionsPage: React.FC = () => {
     editingSession,
     viewModal,
     formModal,
+    statusChangeSession,
+    statusModal,
     setPage,
     setSearch,
     setStatus,
@@ -38,6 +41,8 @@ const SessionsPage: React.FC = () => {
     handleEdit,
     handleAddNew,
     handleFormSuccess,
+    handleChangeStatus,
+    handleConfirmStatusChange,
     resetFilters,
   } = useSessions();
 
@@ -97,6 +102,7 @@ const SessionsPage: React.FC = () => {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onSetActive={handleSetActive}
+            onChangeStatus={handleChangeStatus}
           />
           <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           <div className="text-xs text-[var(--text-tertiary)] text-right">Total: {totalCount} session{totalCount !== 1 ? "s" : ""}</div>
@@ -105,6 +111,13 @@ const SessionsPage: React.FC = () => {
 
       <ViewSessionModal isOpen={viewModal.isOpen} onClose={viewModal.close} session={selectedSession} />
       <CreateSessionModal isOpen={formModal.isOpen} onClose={formModal.close} onSuccess={handleFormSuccess} initialData={editingSession} />
+      <ChangeSessionStatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        sessionName={statusChangeSession?.name || ""}
+        currentStatus={statusChangeSession?.status || ""}
+        onConfirm={handleConfirmStatusChange}
+      />
     </div>
   );
 };

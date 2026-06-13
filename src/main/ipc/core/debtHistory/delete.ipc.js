@@ -7,7 +7,7 @@ module.exports = async function deleteDebtHistory(params, queryRunner) {
   try {
     logger.info("IPC: deleteDebtHistory", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await debtHistoryService.delete(params.id, "system");
+    const result = await debtHistoryService.delete(params.id, "system", queryRunner);
     return { status: true, message: "Debt history deleted", data: result };
   } catch (error) {
     logger.error("IPC: deleteDebtHistory error:", error);

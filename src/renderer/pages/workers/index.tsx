@@ -8,6 +8,7 @@ import { useWorkers } from "./hooks/useWorkers";
 import WorkerTable from "./components/WorkerTable";
 import CreateWorkerModal from "./components/CreateWorkerModal";
 import ViewWorkerModal from "./components/ViewWorkerModal";
+import ChangeWorkerStatusModal from "./components/ChangeWorkerStatusModal";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -25,10 +26,11 @@ const WorkersPage: React.FC = () => {
     totalPages,
     totalCount,
     filters,
-    selectedWorker,
     editingWorker,
     viewModal,
     formModal,
+    statusChangeWorker,
+    statusModal,
     setPage,
     setSearch,
     setStatus,
@@ -37,6 +39,8 @@ const WorkersPage: React.FC = () => {
     handleEdit,
     handleAddNew,
     handleFormSuccess,
+    handleChangeStatus,
+    handleConfirmStatusChange,
     resetFilters,
   } = useWorkers();
 
@@ -55,7 +59,7 @@ const WorkersPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Filters Bar (inline) */}
+      {/* Filters Bar */}
       <div className="bg-[var(--card-bg)] rounded-xl p-4 border border-[var(--border-color)] space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
           <Filter className="w-4 h-4" /> Filters
@@ -101,6 +105,7 @@ const WorkersPage: React.FC = () => {
             onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onChangeStatus={handleChangeStatus}
           />
           <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           <div className="text-xs text-[var(--text-tertiary)] text-right">
@@ -113,13 +118,20 @@ const WorkersPage: React.FC = () => {
       <ViewWorkerModal
         isOpen={viewModal.isOpen}
         onClose={viewModal.close}
-        worker={selectedWorker}
+        workerId={viewModal.selectedId? viewModal.selectedId:null}
       />
       <CreateWorkerModal
         isOpen={formModal.isOpen}
         onClose={formModal.close}
         onSuccess={handleFormSuccess}
         initialData={editingWorker}
+      />
+      <ChangeWorkerStatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        workerName={statusChangeWorker?.name || ""}
+        currentStatus={statusChangeWorker?.status || ""}
+        onConfirm={handleConfirmStatusChange}
       />
     </div>
   );

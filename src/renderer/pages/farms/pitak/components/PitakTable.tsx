@@ -1,9 +1,9 @@
 // src/renderer/pages/farms/pitak/components/PitakTable.tsx
 import React from "react";
-import { Eye, Edit, Trash2 } from "lucide-react";
 import type { PitakWithWorkers } from "../types";
 import WorkerAvatarStack from "./WorkerAvatarStack";
 import type { Worker } from "../../../../api/core/worker";
+import PitakActionsDropdown from "./PitakActionsDropdown";
 
 interface PitakTableProps {
   pitaks: PitakWithWorkers[];
@@ -11,6 +11,8 @@ interface PitakTableProps {
   onEdit: (pitak: PitakWithWorkers) => void;
   onDelete: (id: number) => void;
   onWorkerClick: (worker: Worker) => void;
+  onChangeStatus: (pitak: PitakWithWorkers) => void;
+  onViewAllWorkers?: (pitakId: number) => void; // new: navigate to assignments with pitak filter
 }
 
 const statusBadge = (status: string) => {
@@ -33,6 +35,8 @@ const PitakTable: React.FC<PitakTableProps> = ({
   onEdit,
   onDelete,
   onWorkerClick,
+  onChangeStatus,
+  onViewAllWorkers,
 }) => {
   if (pitaks.length === 0) {
     return (
@@ -72,21 +76,20 @@ const PitakTable: React.FC<PitakTableProps> = ({
               <td className="py-2.5 px-4">
                 <WorkerAvatarStack
                   workers={pitak.workers || []}
+                  pitakId={pitak.id}
+                  pitakLocation={pitak.location}
                   onWorkerClick={onWorkerClick}
+                  onViewAllWorkers={onViewAllWorkers}
                 />
               </td>
               <td className="py-2.5 px-4">
-                <div className="flex gap-2">
-                  <button onClick={() => onView(pitak)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="View">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onEdit(pitak)} className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]" title="Edit">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onDelete(pitak.id)} className="p-1 rounded hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <PitakActionsDropdown
+                  pitak={pitak}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onChangeStatus={onChangeStatus}
+                />
               </td>
             </tr>
           ))}

@@ -7,7 +7,7 @@ module.exports = async function deleteWorker(params, queryRunner) {
   try {
     logger.info("IPC: deleteWorker", { params });
     if (!params.id) return { status: false, message: "Missing id", data: null };
-    const result = await workerService.delete(params.id, "system");
+    const result = await workerService.delete(params.id, "system", queryRunner);
     return { status: true, message: "Worker terminated", data: result };
   } catch (error) {
     logger.error("IPC: deleteWorker error:", error);
