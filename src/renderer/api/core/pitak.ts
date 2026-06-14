@@ -44,8 +44,10 @@ export type PitakResponse = ApiResponse<Pitak>;
 export type PitaksResponse = ApiResponse<PaginatedResponse<Pitak>>;
 
 export interface PitakStats {
-  totalPitaks: number;
-  statusBreakdown: Record<string, number>;
+  total: number;
+  active: number;
+  completed: number;
+  cancelled: number;
   totalArea: number;
 }
 
@@ -62,7 +64,10 @@ export interface PitakFilters extends BaseFilters {
 class PitakAPI {
   private channel = "pitak";
 
-  private async call<T = any>(method: string, params: Record<string, any> = {}): Promise<T> {
+  private async call<T = any>(
+    method: string,
+    params: Record<string, any> = {},
+  ): Promise<T> {
     if (!window.backendAPI?.pitak) {
       throw new Error(`Electron API (${this.channel}) not available`);
     }
@@ -77,8 +82,13 @@ class PitakAPI {
           status: true,
           message: response.message,
           data: {
-            items: response.data,           // array of pitaks
-            pagination: response.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+            items: response.data, // array of pitaks
+            pagination: response.pagination || {
+              page: 1,
+              limit: 50,
+              total: 0,
+              pages: 0,
+            },
           },
         };
       }
@@ -99,13 +109,18 @@ class PitakAPI {
     }
   }
 
-  async getByBukid(bukidId: number, params?: Omit<PitakFilters, "bukidId">): Promise<PitaksResponse> {
+  async getByBukid(
+    bukidId: number,
+    params?: Omit<PitakFilters, "bukidId">,
+  ): Promise<PitaksResponse> {
     return this.getAll({ ...params, bukidId });
   }
 
   async getStats(bukidId?: number): Promise<PitakStatsResponse> {
     try {
-      const response = await this.call<PitakStatsResponse>("getPitakStats", { bukidId });
+      const response = await this.call<PitakStatsResponse>("getPitakStats", {
+        bukidId,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
     } catch (error: any) {
@@ -136,7 +151,10 @@ class PitakAPI {
         payload.areaSqm = payload.area;
         delete payload.area;
       }
-      const response = await this.call<PitakResponse>("updatePitak", { id, ...payload });
+      const response = await this.call<PitakResponse>("updatePitak", {
+        id,
+        ...payload,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update pitak");
     } catch (error: any) {
@@ -144,10 +162,16 @@ class PitakAPI {
     }
   }
 
-  async updateStatus(id: number, status: "active" | "completed" | "cancelled"): Promise<PitakResponse> {
+  async updateStatus(
+    id: number,
+    status: "active" | "completed" | "cancelled",
+  ): Promise<PitakResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<PitakResponse>("updateStatus", { id, status });
+      const response = await this.call<PitakResponse>("updateStatus", {
+        id,
+        status,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update pitak status");
     } catch (error: any) {

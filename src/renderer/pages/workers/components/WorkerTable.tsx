@@ -10,15 +10,18 @@ interface WorkerTableProps {
   onEdit: (worker: WorkerWithDetails) => void;
   onDelete: (id: number) => void;
   onChangeStatus: (worker: WorkerWithDetails) => void;
+  // Sorting
+  onSort?: (field: string) => void;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC";
+  // Selection
+  selectedIds?: number[];
+  onSelectRow?: (id: number, checked: boolean) => void;
+  onSelectAll?: (checked: boolean) => void;
 }
 
 const getInitials = (name: string) => {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 };
 
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
@@ -44,8 +47,14 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   onEdit,
   onDelete,
   onChangeStatus,
+  onSort,
+  sortBy,
+  sortOrder,
+  selectedIds = [],
+  onSelectRow,
+  onSelectAll,
 }) => {
-  if (workers?.length === 0) {
+  if (workers.length === 0) {
     return (
       <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">
         No workers found
@@ -53,10 +62,12 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     );
   }
 
+  const allSelected = workers.length > 0 && workers.every(w => selectedIds.includes(w.id));
+  const someSelected = selectedIds.length > 0 && !allSelected;
+
   const handleCall = (contact?: string) => {
     if (contact) window.open(`tel:${contact}`);
   };
-
   const handleEmail = (email?: string) => {
     if (email) window.open(`mailto:${email}`);
   };
@@ -66,11 +77,36 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       <table className="w-full text-sm">
         <thead className="bg-[var(--card-secondary-bg)] border-b border-[var(--border-color)]">
           <tr>
-            <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Name</th>
+            <th className="py-3 px-4 w-8">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(input) => { if (input) input.indeterminate = someSelected; }}
+                onChange={(e) => onSelectAll?.(e.target.checked)}
+                className="rounded border-[var(--border-color)] cursor-pointer"
+              />
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("name")}
+            >
+              Name {sortBy === "name" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Contact</th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Email</th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Address</th>
-            <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Status</th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("status")}
+            >
+              Status {sortBy === "status" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("hireDate")}
+            >
+              Hire Date {sortBy === "hireDate" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
             <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Actions</th>
           </tr>
         </thead>
@@ -78,10 +114,16 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           {workers.map((worker) => (
             <tr key={worker.id} className="border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors">
               <td className="py-2.5 px-4">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(worker.id)}
+                  onChange={(e) => onSelectRow?.(worker.id, e.target.checked)}
+                  className="rounded border-[var(--border-color)] cursor-pointer"
+                />
+              </td>
+              <td className="py-2.5 px-4">
                 <div className="flex items-center gap-3">
-                  <div
-                    className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary-color)] to-[var(--primary-hover)] flex items-center justify-center text-white text-sm font-medium"
-                  >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary-color)] to-[var(--primary-hover)] flex items-center justify-center text-white text-sm font-medium">
                     {getInitials(worker.name)}
                   </div>
                   <span className="font-medium text-[var(--text-primary)]">{worker.name}</span>
@@ -90,11 +132,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               <td className="py-2.5 px-4 text-[var(--text-secondary)]">
                 {worker.contact || "—"}
                 {worker.contact && (
-                  <button
-                    onClick={() => handleCall(worker.contact as any)}
-                    className="ml-2 p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]"
-                    title="Call"
-                  >
+                  <button onClick={() => handleCall(worker.contact as any)} className="ml-2 p-1 rounded hover:bg-[var(--card-hover-bg)]" title="Call">
                     <Phone className="w-3 h-3" />
                   </button>
                 )}
@@ -102,18 +140,15 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               <td className="py-2.5 px-4 text-[var(--text-secondary)]">
                 {worker.email || "—"}
                 {worker.email && (
-                  <button
-                    onClick={() => handleEmail(worker.email as any)}
-                    className="ml-2 p-1 rounded hover:bg-[var(--card-hover-bg)] text-[var(--text-secondary)] hover:text-[var(--primary-color)]"
-                    title="Email"
-                  >
+                  <button onClick={() => handleEmail(worker.email as any)} className="ml-2 p-1 rounded hover:bg-[var(--card-hover-bg)]" title="Email">
                     <Mail className="w-3 h-3" />
                   </button>
                 )}
               </td>
               <td className="py-2.5 px-4 text-[var(--text-secondary)]">{worker.address || "—"}</td>
-              <td className="py-2.5 px-4">
-                <StatusBadge status={worker.status} />
+              <td className="py-2.5 px-4"><StatusBadge status={worker.status} /></td>
+              <td className="py-2.5 px-4 text-[var(--text-secondary)]">
+                {worker.hireDate ? new Date(worker.hireDate).toLocaleDateString() : "—"}
               </td>
               <td className="py-2.5 px-4">
                 <WorkerActionsDropdown

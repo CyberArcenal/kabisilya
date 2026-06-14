@@ -50,9 +50,12 @@ class AssignmentService {
    * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
-    const qrType = qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
     const hasManager = qr && typeof qr === "object" && !!qr.manager;
-    console.log(`[Assignment._getRepo] qr type: ${qrType}, has manager: ${hasManager}`);
+    console.log(
+      `[Assignment._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
 
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
@@ -94,8 +97,11 @@ class AssignmentService {
       const pitak = await pitakRepo.findOne({ where: { id: data.pitakId } });
       if (!pitak) throw new Error(`Pitak with ID ${data.pitakId} not found`);
 
-      const session = await sessionRepo.findOne({ where: { id: data.sessionId } });
-      if (!session) throw new Error(`Session with ID ${data.sessionId} not found`);
+      const session = await sessionRepo.findOne({
+        where: { id: data.sessionId },
+      });
+      if (!session)
+        throw new Error(`Session with ID ${data.sessionId} not found`);
 
       // Check uniqueness (worker + pitak + session) – exclude soft-deleted
       const existing = await assignmentRepo.findOne({
@@ -107,7 +113,9 @@ class AssignmentService {
         },
       });
       if (existing) {
-        throw new Error("An active assignment already exists for this worker, pitak, and session combination");
+        throw new Error(
+          "An active assignment already exists for this worker, pitak, and session combination",
+        );
       }
 
       // Temporary luwangCount – will be corrected by subscriber
@@ -126,7 +134,9 @@ class AssignmentService {
       };
 
       const assignment = assignmentRepo.create(assignmentData);
-      const saved = await saveDb(assignmentRepo, assignment, { queryRunner: qr });
+      const saved = await saveDb(assignmentRepo, assignment, {
+        queryRunner: qr,
+      });
       await auditLogger.logCreate("Assignment", saved.id, saved, user);
       return saved;
     } catch (error) {
@@ -172,7 +182,9 @@ class AssignmentService {
       Object.assign(existing, allowedUpdates);
       existing.updatedAt = new Date();
 
-      const saved = await updateDb(assignmentRepo, existing, { queryRunner: qr });
+      const saved = await updateDb(assignmentRepo, existing, {
+        queryRunner: qr,
+      });
       await auditLogger.logUpdate("Assignment", id, oldData, saved, user);
       return saved;
     } catch (error) {
@@ -193,7 +205,9 @@ class AssignmentService {
     const Assignment = require("../entities/Assignment");
     const assignmentRepo = this._getRepo(qr, Assignment);
 
-    const assignment = await assignmentRepo.findOne({ where: { id, deletedAt: null } });
+    const assignment = await assignmentRepo.findOne({
+      where: { id, deletedAt: null },
+    });
     if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
 
     const oldStatus = assignment.status;
@@ -201,21 +215,38 @@ class AssignmentService {
 
     // Allowed transitions based on AssignmentStatus enum
     const allowedTransitions = {
-      [AssignmentStatus.INITIATED]: [AssignmentStatus.ACTIVE, AssignmentStatus.COMPLETED, AssignmentStatus.CANCELLED],
-      [AssignmentStatus.ACTIVE]: [AssignmentStatus.COMPLETED, AssignmentStatus.CANCELLED],
+      [AssignmentStatus.INITIATED]: [
+        AssignmentStatus.ACTIVE,
+        AssignmentStatus.COMPLETED,
+        AssignmentStatus.CANCELLED,
+      ],
+      [AssignmentStatus.ACTIVE]: [
+        AssignmentStatus.COMPLETED,
+        AssignmentStatus.CANCELLED,
+      ],
       [AssignmentStatus.COMPLETED]: [],
       [AssignmentStatus.CANCELLED]: [],
     };
 
     if (!allowedTransitions[oldStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${oldStatus} to ${newStatus}`);
+      throw new Error(
+        `Invalid status transition from ${oldStatus} to ${newStatus}`,
+      );
     }
 
     assignment.status = newStatus;
     assignment.updatedAt = new Date();
 
-    const saved = await updateDb(assignmentRepo, assignment, { queryRunner: qr });
-    await auditLogger.logUpdate("Assignment", id, { status: oldStatus }, { status: newStatus }, user);
+    const saved = await updateDb(assignmentRepo, assignment, {
+      queryRunner: qr,
+    });
+    await auditLogger.logUpdate(
+      "Assignment",
+      id,
+      { status: oldStatus },
+      { status: newStatus },
+      user,
+    );
     return saved;
   }
 
@@ -231,14 +262,18 @@ class AssignmentService {
     const assignmentRepo = this._getRepo(qr, Assignment);
 
     try {
-      const assignment = await assignmentRepo.findOne({ where: { id, deletedAt: null } });
+      const assignment = await assignmentRepo.findOne({
+        where: { id, deletedAt: null },
+      });
       if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
 
       const oldData = { ...assignment };
       assignment.deletedAt = new Date();
       assignment.updatedAt = new Date();
 
-      const saved = await updateDb(assignmentRepo, assignment, { queryRunner: qr });
+      const saved = await updateDb(assignmentRepo, assignment, {
+        queryRunner: qr,
+      });
       await auditLogger.logDelete("Assignment", id, oldData, user);
       console.log(`Assignment soft deleted: #${id}`);
       return saved;
@@ -260,15 +295,27 @@ class AssignmentService {
     const assignmentRepo = this._getRepo(qr, Assignment);
 
     try {
-      const assignment = await assignmentRepo.findOne({ where: { id }, withDeleted: true });
+      const assignment = await assignmentRepo.findOne({
+        where: { id },
+        withDeleted: true,
+      });
       if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
-      if (!assignment.deletedAt) throw new Error(`Assignment #${id} is not deleted`);
+      if (!assignment.deletedAt)
+        throw new Error(`Assignment #${id} is not deleted`);
 
       assignment.deletedAt = null;
       assignment.updatedAt = new Date();
 
-      const saved = await updateDb(assignmentRepo, assignment, { queryRunner: qr });
-      await auditLogger.logUpdate("Assignment", id, { deletedAt: true }, { deletedAt: null }, user);
+      const saved = await updateDb(assignmentRepo, assignment, {
+        queryRunner: qr,
+      });
+      await auditLogger.logUpdate(
+        "Assignment",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Assignment restored: #${id}`);
       return saved;
     } catch (error) {
@@ -288,7 +335,10 @@ class AssignmentService {
     const Assignment = require("../entities/Assignment");
     const assignmentRepo = this._getRepo(qr, Assignment);
 
-    const assignment = await assignmentRepo.findOne({ where: { id }, withDeleted: true });
+    const assignment = await assignmentRepo.findOne({
+      where: { id },
+      withDeleted: true,
+    });
     if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
 
     await removeDb(assignmentRepo, assignment);
@@ -326,7 +376,9 @@ class AssignmentService {
       throw new Error("No default session set. Cannot access assignment.");
     }
     if (assignment.session?.id !== defaultSessionId) {
-      throw new Error(`Assignment #${id} does not belong to the current session`);
+      throw new Error(
+        `Assignment #${id} does not belong to the current session`,
+      );
     }
 
     await auditLogger.logView("Assignment", id, "system");
@@ -356,7 +408,15 @@ class AssignmentService {
       sessionId = await farmSessionDefaultSessionId();
       if (!sessionId) {
         console.warn("No default session ID available for Assignment.findAll");
-        return { data: [], pagination: { page: options.page || 1, limit: options.limit || 10, total: 0, pages: 0 } };
+        return {
+          data: [],
+          pagination: {
+            page: options.page || 1,
+            limit: options.limit || 10,
+            total: 0,
+            pages: 0,
+          },
+        };
       }
     }
 
@@ -374,22 +434,38 @@ class AssignmentService {
       qb.andWhere("assignment.status = :status", { status: options.status });
     }
     if (options.startDate) {
-      qb.andWhere("assignment.assignmentDate >= :startDate", { startDate: options.startDate });
+      qb.andWhere("assignment.assignmentDate >= :startDate", {
+        startDate: options.startDate,
+      });
     }
     if (options.endDate) {
-      qb.andWhere("assignment.assignmentDate <= :endDate", { endDate: options.endDate });
+      qb.andWhere("assignment.assignmentDate <= :endDate", {
+        endDate: options.endDate,
+      });
     }
     if (options.search) {
       qb.andWhere(
         "(worker.name LIKE :search OR pitak.name LIKE :search OR assignment.notes LIKE :search)",
-        { search: `%${options.search}%` }
+        { search: `%${options.search}%` },
       );
     }
 
     // Sorting
-    const sortBy = options.sortBy || "assignmentDate";
-    const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
-    qb.orderBy(`assignment.${sortBy}`, sortOrder);
+    const sortMap = {
+      "worker.name": "worker.name",
+      "pitak.location": "pitak.location",
+      "session.name": "session.name",
+      luwangCount: "assignment.luwangCount",
+      assignmentDate: "assignment.assignmentDate",
+      status: "assignment.status",
+      createdAt: "assignment.createdAt",
+    };
+    let sortBy =
+      options.sortBy && sortMap[options.sortBy]
+        ? sortMap[options.sortBy]
+        : "assignment.assignmentDate";
+    let sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
+    qb.orderBy(sortBy, sortOrder);
 
     // Pagination using utility
     const result = await paginateQueryBuilder(qb, {
@@ -406,16 +482,41 @@ class AssignmentService {
    */
   async getStatistics() {
     const { assignment: repo } = await this.getRepositories();
-    const qb = repo.createQueryBuilder("assignment").where("assignment.deletedAt IS NULL");
+    const qb = repo
+      .createQueryBuilder("assignment")
+      .where("assignment.deletedAt IS NULL");
 
     const total = await qb.getCount();
-    const active = await qb.clone().andWhere("assignment.status = :status", { status: AssignmentStatus.ACTIVE }).getCount();
-    const completed = await qb.clone().andWhere("assignment.status = :status", { status: AssignmentStatus.COMPLETED }).getCount();
-    const cancelled = await qb.clone().andWhere("assignment.status = :status", { status: AssignmentStatus.CANCELLED }).getCount();
-    const initiated = await qb.clone().andWhere("assignment.status = :status", { status: AssignmentStatus.INITIATED }).getCount();
+    const active = await qb
+      .clone()
+      .andWhere("assignment.status = :status", {
+        status: AssignmentStatus.ACTIVE,
+      })
+      .getCount();
+    const completed = await qb
+      .clone()
+      .andWhere("assignment.status = :status", {
+        status: AssignmentStatus.COMPLETED,
+      })
+      .getCount();
+    const cancelled = await qb
+      .clone()
+      .andWhere("assignment.status = :status", {
+        status: AssignmentStatus.CANCELLED,
+      })
+      .getCount();
+    const initiated = await qb
+      .clone()
+      .andWhere("assignment.status = :status", {
+        status: AssignmentStatus.INITIATED,
+      })
+      .getCount();
 
     // Sum of luwangCount (optional)
-    const totalLuwangResult = await qb.clone().select("SUM(assignment.luwangCount)", "sum").getRawOne();
+    const totalLuwangResult = await qb
+      .clone()
+      .select("SUM(assignment.luwangCount)", "sum")
+      .getRawOne();
     const totalLuwang = parseFloat(totalLuwangResult.sum) || 0;
 
     return {
@@ -424,6 +525,67 @@ class AssignmentService {
       completed,
       cancelled,
       initiated,
+      totalLuwang,
+    };
+  }
+
+  async getStatisticsWithFilters(options = {}) {
+    const { assignment: repo } = await this.getRepositories();
+    const qb = repo
+      .createQueryBuilder("assignment")
+      .leftJoin("assignment.worker", "worker")
+      .leftJoin("assignment.pitak", "pitak")
+      .leftJoin("assignment.session", "session")
+      .where("assignment.deletedAt IS NULL");
+
+    // Apply same filters as findAll
+    if (options.workerId)
+      qb.andWhere("worker.id = :workerId", { workerId: options.workerId });
+    if (options.pitakId)
+      qb.andWhere("pitak.id = :pitakId", { pitakId: options.pitakId });
+    if (options.sessionId)
+      qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
+    if (options.status)
+      qb.andWhere("assignment.status = :status", { status: options.status });
+    if (options.startDate)
+      qb.andWhere("assignment.assignmentDate >= :startDate", {
+        startDate: new Date(options.startDate),
+      });
+    if (options.endDate)
+      qb.andWhere("assignment.assignmentDate <= :endDate", {
+        endDate: new Date(options.endDate),
+      });
+    if (options.search) {
+      qb.andWhere(
+        "(worker.name LIKE :search OR pitak.location LIKE :search OR assignment.notes LIKE :search)",
+        { search: `%${options.search}%` },
+      );
+    }
+
+    const total = await qb.getCount();
+    const statusCounts = await qb
+      .clone()
+      .select("assignment.status", "status")
+      .addSelect("COUNT(assignment.id)", "count")
+      .groupBy("assignment.status")
+      .getRawMany();
+    const breakdown = statusCounts.reduce((acc, row) => {
+      acc[row.status] = parseInt(row.count, 10);
+      return acc;
+    }, {});
+
+    const totalLuwangResult = await qb
+      .clone()
+      .select("SUM(assignment.luwangCount)", "totalLuwang")
+      .getRawOne();
+    const totalLuwang = parseFloat(totalLuwangResult.totalLuwang) || 0;
+
+    return {
+      total,
+      active: breakdown.active || 0,
+      completed: breakdown.completed || 0,
+      cancelled: breakdown.cancelled || 0,
+      initiated: breakdown.initiated || 0,
       totalLuwang,
     };
   }
@@ -441,8 +603,18 @@ class AssignmentService {
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Worker ID", "Worker Name", "Pitak ID", "Pitak Name", "Session ID",
-        "Luwang Count", "Assignment Date", "Status", "Notes", "Created At", "Updated At"
+        "ID",
+        "Worker ID",
+        "Worker Name",
+        "Pitak ID",
+        "Pitak Name",
+        "Session ID",
+        "Luwang Count",
+        "Assignment Date",
+        "Status",
+        "Notes",
+        "Created At",
+        "Updated At",
       ];
       const rows = assignments.map((a) => [
         a.id,
@@ -472,7 +644,9 @@ class AssignmentService {
     }
 
     await auditLogger.logExport("Assignment", format, filters, user);
-    console.log(`Exported ${assignments.length} assignments in ${format} format`);
+    console.log(
+      `Exported ${assignments.length} assignments in ${format} format`,
+    );
     return exportData;
   }
 
@@ -540,8 +714,15 @@ class AssignmentService {
           assignmentDate: record.assignmentDate,
           notes: record.notes || null,
         };
-        if (!assignmentData.workerId || !assignmentData.pitakId || !assignmentData.sessionId || !assignmentData.assignmentDate) {
-          throw new Error("Missing required fields: workerId, pitakId, sessionId, assignmentDate");
+        if (
+          !assignmentData.workerId ||
+          !assignmentData.pitakId ||
+          !assignmentData.sessionId ||
+          !assignmentData.assignmentDate
+        ) {
+          throw new Error(
+            "Missing required fields: workerId, pitakId, sessionId, assignmentDate",
+          );
         }
         const saved = await this.create(assignmentData, user, qr);
         results.imported.push(saved);

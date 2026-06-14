@@ -13,38 +13,12 @@ module.exports = async function getAssignmentStats(params) {
   try {
     logger.info("IPC: getAssignmentStats", { params });
 
-    const assignmentRepo = AppDataSource.getRepository(Assignment);
-    const queryBuilder = assignmentRepo.createQueryBuilder("assignment");
-
-    if (params.sessionId) {
-      queryBuilder.where("assignment.sessionId = :sessionId", {
-        sessionId: params.sessionId,
-      });
-    }
-
-    const totalCount = await queryBuilder.getCount();
-    const statusCounts = await queryBuilder
-      .select("assignment.status, COUNT(*) as count")
-      .groupBy("assignment.status")
-      .getRawMany();
-
-    const totalLuwang = await queryBuilder
-      .select("SUM(assignment.luwangCount)", "total")
-      .getRawOne();
-
-    const stats = {
-      totalAssignments: totalCount,
-      statusBreakdown: statusCounts.reduce((acc, row) => {
-        acc[row.status] = parseInt(row.count);
-        return acc;
-      }, {}),
-      totalLuwang: parseFloat(totalLuwang?.total || 0),
-    };
+   const result = await assignmentService.getStatisticsWithFilters(params)
 
     return {
       status: true,
       message: "Assignment statistics retrieved",
-      data: stats,
+      data: result,
     };
   } catch (error) {
     logger.error("IPC: getAssignmentStats error:", error);

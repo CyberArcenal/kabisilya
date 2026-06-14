@@ -165,7 +165,7 @@ const BukidPage: React.FC = () => {
           </button>
           <Button
             variant="primary"
-            size="md"
+            size="sm"
             icon={Plus}
             onClick={handleAddNew}
           >

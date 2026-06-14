@@ -8,13 +8,12 @@ import pitakAPI from "../../../../api/core/pitak";
 import assignmentAPI from "../../../../api/core/assignment";
 import type { Worker } from "../../../../api/core/worker";
 
-const PAGE_SIZE = 10;
 const DEBOUNCE_MS = 300;
 
 export const usePitaks = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // State
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // Data state
   const [pitaks, setPitaks] = useState<PitakWithWorkers[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPageState] = useState(() => {
@@ -24,7 +23,19 @@ export const usePitaks = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Filters (initialized from URL)
+  // Pagination & Sorting
+  const [limit, setLimitState] = useState(() => {
+    const l = searchParams.get("limit");
+    return l ? parseInt(l, 10) : 10;
+  });
+  const [sortBy, setSortBy] = useState(
+    () => searchParams.get("sortBy") || "createdAt",
+  );
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">(
+    () => (searchParams.get("sortOrder") as "ASC" | "DESC") || "DESC",
+  );
+
+  // Filters
   const [search, setSearchState] = useState(
     () => searchParams.get("search") || "",
   );
@@ -35,8 +46,21 @@ export const usePitaks = () => {
   const [status, setStatusState] = useState(
     () => searchParams.get("status") || "",
   );
+  const [sessionId, setSessionIdState] = useState<number | undefined>(() => {
+    const id = searchParams.get("session");
+    return id ? parseInt(id, 10) : undefined;
+  });
 
-  // Selected pitak for modals
+  // Stats for summary cards
+  const [stats, setStats] = useState({
+    totalPlots: 0,
+    activePlots: 0,
+    completedPlots: 0,
+    totalArea: 0,
+    totalWorkers: 0,
+  });
+
+  // Modal states
   const [selectedPitak, setSelectedPitak] = useState<PitakWithWorkers | null>(
     null,
   );
@@ -45,43 +69,57 @@ export const usePitaks = () => {
   >(null);
   const [statusChangePitak, setStatusChangePitak] =
     useState<PitakWithWorkers | null>(null);
-
-  // Modals
   const viewModal = useModal();
   const formModal = useModal();
   const statusModal = useModal();
 
-  // Refs for abort control and debounce
+  // Refs
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const searchDebounceRef = useRef<NodeJS.Timeout>();
-  const bukidDebounceRef = useRef<NodeJS.Timeout>();
-  const statusDebounceRef = useRef<NodeJS.Timeout>();
+  const debounceRefs = {
+    search: useRef<NodeJS.Timeout>(),
+    bukidId: useRef<NodeJS.Timeout>(),
+    status: useRef<NodeJS.Timeout>(),
+    sessionId: useRef<NodeJS.Timeout>(),
+  };
 
-  // Helper: update URL with current filters
+  // URL update helper
   const updateUrl = useCallback(
     (
       newPage: number,
       newSearch: string,
       newBukidId: number | undefined,
       newStatus: string,
+      newSessionId: number | undefined,
+      newLimit: number,
+      newSortBy: string,
+      newSortOrder: "ASC" | "DESC",
     ) => {
       const params: Record<string, string> = {};
       if (newSearch) params.search = newSearch;
       if (newBukidId) params.bukid = newBukidId.toString();
       if (newStatus) params.status = newStatus;
+      if (newSessionId) params.session = newSessionId.toString();
       if (newPage > 1) params.page = newPage.toString();
+      if (newLimit !== 10) params.limit = newLimit.toString();
+      if (newSortBy !== "createdAt") params.sortBy = newSortBy;
+      if (newSortOrder !== "DESC") params.sortOrder = newSortOrder;
       setSearchParams(params, { replace: true });
     },
     [setSearchParams],
   );
 
-  // Sync URL changes (browser back/forward) to state
+  // Sync URL changes to state
   useEffect(() => {
     const urlPage = searchParams.get("page");
     const urlSearch = searchParams.get("search") || "";
     const urlBukid = searchParams.get("bukid");
     const urlStatus = searchParams.get("status") || "";
+    const urlSession = searchParams.get("session");
+    const urlLimit = searchParams.get("limit");
+    const urlSortBy = searchParams.get("sortBy") || "createdAt";
+    const urlSortOrder =
+      (searchParams.get("sortOrder") as "ASC" | "DESC") || "DESC";
 
     let needsUpdate = false;
     const newPage = urlPage ? parseInt(urlPage, 10) : 1;
@@ -102,82 +140,143 @@ export const usePitaks = () => {
       setStatusState(urlStatus);
       needsUpdate = true;
     }
-  }, [searchParams]); // runs when URL changes (back/forward)
+    const newSessionId = urlSession ? parseInt(urlSession, 10) : undefined;
+    if (newSessionId !== sessionId) {
+      setSessionIdState(newSessionId);
+      needsUpdate = true;
+    }
+    const newLimit = urlLimit ? parseInt(urlLimit, 10) : 10;
+    if (newLimit !== limit) {
+      setLimitState(newLimit);
+      needsUpdate = true;
+    }
+    if (urlSortBy !== sortBy) {
+      setSortBy(urlSortBy);
+      needsUpdate = true;
+    }
+    if (urlSortOrder !== sortOrder) {
+      setSortOrder(urlSortOrder);
+      needsUpdate = true;
+    }
+  }, [searchParams]);
 
-  // Setters that update state and URL (for user interactions)
+  // Setters with URL update
   const setPage = (newPage: number) => {
     if (newPage === page) return;
     setPageState(newPage);
-    updateUrl(newPage, search, bukidId, status);
+    updateUrl(
+      newPage,
+      search,
+      bukidId,
+      status,
+      sessionId,
+      limit,
+      sortBy,
+      sortOrder,
+    );
   };
-
+  const setLimit = (newLimit: number) => {
+    setLimitState(newLimit);
+    setPageState(1);
+    updateUrl(
+      1,
+      search,
+      bukidId,
+      status,
+      sessionId,
+      newLimit,
+      sortBy,
+      sortOrder,
+    );
+  };
+  const setSort = (field: string) => {
+    let newSortBy = field;
+    let newSortOrder: "ASC" | "DESC" = "DESC";
+    if (sortBy === field) {
+      newSortOrder = sortOrder === "ASC" ? "DESC" : "ASC";
+    }
+    setSortBy(newSortBy);
+    setSortOrder(newSortOrder);
+    setPageState(1);
+    updateUrl(
+      1,
+      search,
+      bukidId,
+      status,
+      sessionId,
+      limit,
+      newSortBy,
+      newSortOrder,
+    );
+  };
   const setSearch = (val: string) => {
     setSearchState(val);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      updateUrl(1, val, bukidId, status);
+    if (debounceRefs.search.current) clearTimeout(debounceRefs.search.current);
+    debounceRefs.search.current = setTimeout(() => {
+      updateUrl(1, val, bukidId, status, sessionId, limit, sortBy, sortOrder);
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setBukidId = (val: number | undefined) => {
     setBukidIdState(val);
-    if (bukidDebounceRef.current) clearTimeout(bukidDebounceRef.current);
-    bukidDebounceRef.current = setTimeout(() => {
-      updateUrl(1, search, val, status);
+    if (debounceRefs.bukidId.current)
+      clearTimeout(debounceRefs.bukidId.current);
+    debounceRefs.bukidId.current = setTimeout(() => {
+      updateUrl(1, search, val, status, sessionId, limit, sortBy, sortOrder);
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setStatus = (val: string) => {
     setStatusState(val);
-    if (statusDebounceRef.current) clearTimeout(statusDebounceRef.current);
-    statusDebounceRef.current = setTimeout(() => {
-      updateUrl(1, search, bukidId, val);
+    if (debounceRefs.status.current) clearTimeout(debounceRefs.status.current);
+    debounceRefs.status.current = setTimeout(() => {
+      updateUrl(1, search, bukidId, val, sessionId, limit, sortBy, sortOrder);
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
+  const setSessionId = (val: number | undefined) => {
+    setSessionIdState(val);
+    if (debounceRefs.sessionId.current)
+      clearTimeout(debounceRefs.sessionId.current);
+    debounceRefs.sessionId.current = setTimeout(() => {
+      updateUrl(1, search, bukidId, status, val, limit, sortBy, sortOrder);
+      setPageState(1);
+    }, DEBOUNCE_MS);
+  };
   const resetFilters = () => {
     setSearchState("");
     setBukidIdState(undefined);
     setStatusState("");
+    setSessionIdState(undefined);
     setPageState(1);
-    updateUrl(1, "", undefined, "");
+    updateUrl(1, "", undefined, "", undefined, limit, sortBy, sortOrder);
   };
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       abortControllerRef.current?.abort();
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-      if (bukidDebounceRef.current) clearTimeout(bukidDebounceRef.current);
-      if (statusDebounceRef.current) clearTimeout(statusDebounceRef.current);
+      Object.values(debounceRefs).forEach(
+        (ref) => ref.current && clearTimeout(ref.current),
+      );
     };
   }, []);
 
   // Fetch pitaks
   const fetchPitaks = useCallback(async () => {
-    // Cancel previous request
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-
     if (!isMountedRef.current) return;
     setLoading(true);
-
     try {
-      const params: any = {
-        page,
-        limit: PAGE_SIZE,
-        sortBy: "createdAt",
-        sortOrder: "DESC",
-      };
+      const params: any = { page, limit, sortBy, sortOrder };
       if (search) params.search = search;
       if (bukidId) params.bukidId = bukidId;
       if (status) params.status = status;
+      if (sessionId) params.sessionId = sessionId;
 
       const pitakRes = await pitakAPI.getAll(params);
       if (controller.signal.aborted || !isMountedRef.current) return;
@@ -191,7 +290,6 @@ export const usePitaks = () => {
       // Fetch assignments to get workers for each pitak
       const assignmentRes = await assignmentAPI.getAll({ limit: 1000 });
       if (controller.signal.aborted || !isMountedRef.current) return;
-
       const workersByPitak = new Map<number, Worker[]>();
       if (assignmentRes.status && assignmentRes.data.items) {
         assignmentRes.data.items.forEach((ass) => {
@@ -202,30 +300,51 @@ export const usePitaks = () => {
           }
         });
       }
-
       const enriched = pitakList.map((pitak) => ({
         ...pitak,
         workers: workersByPitak.get(pitak.id) || [],
       }));
-
-      if (!controller.signal.aborted && isMountedRef.current) {
-        setPitaks(enriched);
-      }
+      setPitaks(enriched);
     } catch (error: any) {
       if (error.name === "AbortError") return;
       console.error("Failed to fetch pitaks", error);
     } finally {
-      if (isMountedRef.current && !controller.signal.aborted) {
-        setLoading(false);
-      }
+      if (isMountedRef.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [page, search, bukidId, status]);
+  }, [page, limit, sortBy, sortOrder, search, bukidId, status, sessionId]);
 
   useEffect(() => {
     fetchPitaks();
   }, [fetchPitaks]);
 
-  // CRUD Handlers
+  // Fetch stats for summary cards
+  const fetchStats = useCallback(async () => {
+    try {
+      const params: any = {};
+      if (bukidId) params.bukidId = bukidId;
+      if (status) params.status = status;
+      if (sessionId) params.sessionId = sessionId;
+      if (search) params.search = search;
+      const res = await pitakAPI.getStats(params); // requires backend implementation
+      if (res.status && res.data) {
+        setStats({
+          totalPlots: res.data.total,
+          activePlots: res.data.active,
+          completedPlots: res.data.completed,
+          totalArea: res.data.totalArea,
+          totalWorkers: 0, // optional
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch pitak stats", error);
+    }
+  }, [bukidId, status, sessionId, search]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // CRUD handlers (unchanged)
   const handleDelete = async (id: number) => {
     const confirmed = await dialogs.confirm({
       title: "Delete Plot",
@@ -247,18 +366,18 @@ export const usePitaks = () => {
     viewModal.open();
   };
 
-const handleEdit = (pitak: PitakWithWorkers) => {
-  setEditingPitak({
-    id: pitak.id,
-    bukidId: pitak.bukid?.id || 0,
-    location: pitak.location || "",
-    area: pitak.area,                     // keep for backward compatibility
-    totalLuwang: pitak.totalLuwang,       // ✅ add this line
-    description: pitak.description || "",
-    status: pitak.status,
-  });
-  formModal.open();
-};
+  const handleEdit = (pitak: PitakWithWorkers) => {
+    setEditingPitak({
+      id: pitak.id,
+      bukidId: pitak.bukid?.id || 0,
+      location: pitak.location || "",
+      area: pitak.area,
+      totalLuwang: pitak.totalLuwang,
+      description: pitak.description || "",
+      status: pitak.status,
+    });
+    formModal.open();
+  };
 
   const handleAddNew = () => {
     setEditingPitak(null);
@@ -269,6 +388,7 @@ const handleEdit = (pitak: PitakWithWorkers) => {
     formModal.close();
     setEditingPitak(null);
     fetchPitaks();
+    fetchStats();
   };
 
   const handleChangeStatus = (pitak: PitakWithWorkers) => {
@@ -283,35 +403,154 @@ const handleEdit = (pitak: PitakWithWorkers) => {
     setStatusChangePitak(null);
   };
 
+  // Bulk actions
+  const bulkDelete = async (ids: number[]) => {
+    const confirmed = await dialogs.confirm({
+      title: "Bulk Delete",
+      message: `Are you sure you want to delete ${ids.length} plot(s)? This action cannot be undone.`,
+      confirmText: "Delete",
+      icon: "danger",
+    });
+    if (!confirmed) return;
+    try {
+      await Promise.all(ids.map((id) => pitakAPI.delete(id)));
+      await fetchPitaks();
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("Bulk delete failed", error);
+      dialogs.error("Failed to delete plots");
+    }
+  };
+
+  const bulkStatusChange = async (ids: number[], newStatus: string) => {
+    const confirmed = await dialogs.confirm({
+      title: "Bulk Status Change",
+      message: `Change ${ids.length} plot(s) to "${newStatus}"?`,
+      confirmText: "Change",
+    });
+    if (!confirmed) return;
+    try {
+      await Promise.all(
+        ids.map((id) => pitakAPI.updateStatus(id, newStatus as any)),
+      );
+      await fetchPitaks();
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("Bulk status change failed", error);
+      dialogs.error("Failed to change status");
+    }
+  };
+
+  const bulkExport = () => {
+    const selectedPlots = pitaks.filter((p) => selectedIds.includes(p.id));
+    if (selectedPlots.length === 0) return;
+    const headers = [
+      "ID",
+      "Location",
+      "Farm",
+      "Area (luwang)",
+      "Status",
+      "Created At",
+    ];
+    const rows = selectedPlots.map((p) => [
+      p.id,
+      p.location,
+      p.bukid?.name || "",
+      p.totalLuwang ?? "",
+      p.status,
+      new Date(p.createdAt).toLocaleDateString(),
+    ]);
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `selected_pitaks_${new Date().toISOString().slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export CSV
+  const exportToCSV = async () => {
+    const params: any = {
+      limit: 10000,
+      search,
+      bukidId,
+      status,
+      sessionId,
+      sortBy,
+      sortOrder,
+    };
+    const res = await pitakAPI.getAll(params);
+    if (res.status) {
+      const items = res.data.items;
+      const headers = [
+        "ID",
+        "Location",
+        "Farm",
+        "Area (luwang)",
+        "Status",
+        "Created At",
+      ];
+      const rows = items.map((p) => [
+        p.id,
+        p.location,
+        p.bukid?.name || "",
+        p.totalLuwang ?? "",
+        p.status,
+        new Date(p.createdAt).toLocaleDateString(),
+      ]);
+      const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pitaks_export_${new Date().toISOString().slice(0, 19)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      dialogs.error("Failed to export plots");
+    }
+  };
+
   return {
-    // Data
     pitaks,
     loading,
     page,
     totalPages,
     totalCount,
-    // Filters
-    filters: { search, bukidId, status },
-    // Setters
-    setPage,
-    setSearch,
-    setBukidId,
-    setStatus,
-    // Modal states and handlers
+    filters: { search, bukidId, status, sessionId },
+    stats,
+    limit,
+    sortBy,
+    sortOrder,
     selectedPitak,
     editingPitak,
     viewModal,
     formModal,
     statusChangePitak,
     statusModal,
-    handleChangeStatus,
-    handleConfirmStatusChange,
+     selectedIds,
+  setSelectedIds,
+  bulkDelete,
+  bulkStatusChange,
+  bulkExport,
+    setPage,
+    setLimit,
+    setSort,
+    setSearch,
+    setBukidId,
+    setStatus,
+    setSessionId,
     handleDelete,
     handleView,
     handleEdit,
     handleAddNew,
     handleFormSuccess,
+    handleChangeStatus,
+    handleConfirmStatusChange,
     resetFilters,
     refetch: fetchPitaks,
+    exportToCSV,
   };
 };

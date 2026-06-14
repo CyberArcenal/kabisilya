@@ -1,6 +1,15 @@
 // src/renderer/pages/farms/assignments/index.tsx
-import React from "react";
-import { Plus, Filter, X, Users, RefreshCw } from "lucide-react"; // added RefreshCw
+import React, { useState } from "react";
+import {
+  Plus,
+  Filter,
+  X,
+  Users,
+  RefreshCw,
+  Eye,
+  Download,
+  EyeOff,
+} from "lucide-react"; // added RefreshCw
 import Button from "../../../components/UI/Button";
 import Pagination from "../../../components/UI/Pagination";
 import LoadingSpinner from "../../../components/Shared/LoadingSpinner";
@@ -15,6 +24,8 @@ import type { AssignmentWithDetails } from "./types";
 import ChangeAssignmentStatusModal from "./components/ChangeAssignmentStatusModal";
 import { useModal } from "../../../hooks/useModal";
 import ViewAssignmentModal from "../../../components/Modals/ViewAssignmentModal";
+import AssignmentSummaryCards from "./components/AssignmentSummaryCards";
+import BulkActionsBar from "./components/BulkActionsBar";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -39,6 +50,20 @@ const AssignmentsPage: React.FC = () => {
     bulkModal,
     statusChangeAssignment,
     statusModal,
+
+    limit,
+    setLimitState,
+    setLimit,
+    sortBy,
+    sortOrder,
+    setSortOrder,
+    stats,
+    selectedIds,
+    setSelectedIds,
+    bulkDelete,
+    bulkStatusChange,
+    bulkExport,
+    setSort,
     handleChangeStatus,
     handleConfirmStatusChange,
     setPage,
@@ -56,6 +81,7 @@ const AssignmentsPage: React.FC = () => {
     handleFormSuccess,
     handleBulkSuccess,
     resetFilters,
+    exportToCSV,
     refetch, // <-- added
   } = useAssignments();
 
@@ -70,7 +96,8 @@ const AssignmentsPage: React.FC = () => {
   );
 
   const assignmentModal = useModal();
-
+  const [showStats, setShowStats] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const handleViewAssignment = (assignment: AssignmentWithDetails) => {
     assignmentModal.setSelected(assignment.id);
     assignmentModal.open();
@@ -81,97 +108,212 @@ const AssignmentsPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Assignments</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Manage worker assignments to plots</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Assignments
+          </h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Manage worker assignments to plots
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="md" icon={Users} onClick={bulkModal.open}>
-            Bulk Assign
-          </Button>
-          <Button variant="primary" size="md" icon={Plus} onClick={handleAddNew}>
-            Add Assignment
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters Bar */}
-      <div className="bg-[var(--card-bg)] rounded-xl p-4 border border-[var(--border-color)] space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
-            <Filter className="w-4 h-4" /> Filters
-          </div>
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors"
+            title={showStats ? "Hide summary cards" : "Show summary cards"}
+          >
+            {showStats ? (
+              <EyeOff className="w-4 h-4" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
+          </button>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors"
+            title={showFilters ? "Hide filters" : "Show filters"}
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+          <button
+            onClick={exportToCSV}
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors"
+            title="Export all plots (current filters)"
+          >
+            <Download className="w-4 h-4" />
+          </button>
           <button
             onClick={refetch}
             disabled={loading}
-            className="p-1.5 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors text-[var(--text-secondary)]"
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors disabled:opacity-50"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input
-            type="text"
-            placeholder="Search worker or plot..."
-            value={filters.search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          />
-          <WorkerSelect
-            value={filters.workerId || null}
-            onChange={(id) => { setWorkerId(id || undefined); setPage(1); }}
-            placeholder="All workers"
-          />
-          <PitakSelect
-            value={filters.pitakId || null}
-            onChange={(id) => { setPitakId(id || undefined); setPage(1); }}
-            placeholder="All plots"
-          />
-          <SessionSelect
-            value={filters.sessionId || null}
-            onChange={(id) => { setSessionId(id || undefined); setPage(1); }}
-            placeholder="All sessions"
-          />
-          <select
-            value={filters.status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Users}
+            onClick={bulkModal.open}
           >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            placeholder="Start date"
-            value={filters.startDate}
-            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          />
-          <input
-            type="date"
-            placeholder="End date"
-            value={filters.endDate}
-            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-            className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          />
+            Bulk Assign
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={handleAddNew}
+          >
+            Add Assignment
+          </Button>
         </div>
-        {hasFilters && (
-          <div className="flex justify-end">
-            <button onClick={resetFilters} className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1">
-              <X className="w-3 h-3" /> Clear all filters
+      </div>
+      {showStats && (
+        <AssignmentSummaryCards
+          total={stats.total}
+          active={stats.active}
+          completed={stats.completed}
+          totalLuwang={stats.totalLuwang}
+          cancelled={stats.cancelled}
+          initiated={stats.initiated}
+        />
+      )}
+      {/* Filters Bar */}
+      {showFilters && (
+        <div className="bg-[var(--card-bg)] rounded-xl p-4 border border-[var(--border-color)] space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+              <Filter className="w-4 h-4" /> Filters
+            </div>
+            <button
+              onClick={refetch}
+              disabled={loading}
+              className="p-1.5 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors text-[var(--text-secondary)]"
+              title="Refresh"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
             </button>
           </div>
-        )}
-      </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <input
+              type="text"
+              placeholder="Search worker or plot..."
+              value={filters.search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            />
+            <WorkerSelect
+              value={filters.workerId || null}
+              onChange={(id) => {
+                setWorkerId(id || undefined);
+                setPage(1);
+              }}
+              placeholder="All workers"
+            />
+            <PitakSelect
+              value={filters.pitakId || null}
+              onChange={(id) => {
+                setPitakId(id || undefined);
+                setPage(1);
+              }}
+              placeholder="All plots"
+            />
+            <SessionSelect
+              value={filters.sessionId || null}
+              onChange={(id) => {
+                setSessionId(id || undefined);
+                setPage(1);
+              }}
+              placeholder="All sessions"
+            />
+            <select
+              value={filters.status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {statusOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              placeholder="Start date"
+              value={filters.startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            />
+            <input
+              type="date"
+              placeholder="End date"
+              value={filters.endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </div>
+          {hasFilters && (
+            <div className="flex justify-end">
+              <button
+                onClick={resetFilters}
+                className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1"
+              >
+                <X className="w-3 h-3" /> Clear all filters
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
+      {selectedIds.length > 0 && (
+        <BulkActionsBar
+          selectedCount={selectedIds.length}
+          onStatusChange={(newStatus) =>
+            bulkStatusChange(selectedIds, newStatus)
+          }
+          onDelete={() => bulkDelete(selectedIds)}
+          onExport={bulkExport}
+          onClearSelection={() => setSelectedIds([])}
+        />
+      )}
       {/* Table */}
       {loading ? (
-        <div className="flex justify-center py-12"><LoadingSpinner size="medium" /></div>
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="medium" />
+        </div>
       ) : (
         <>
           <AssignmentTable
@@ -180,19 +322,45 @@ const AssignmentsPage: React.FC = () => {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onChangeStatus={handleChangeStatus}
+            onSort={setSort} // need setSort function from hook
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            selectedIds={selectedIds}
+            onSelectRow={(id, checked) => {
+              setSelectedIds((prev) =>
+                checked ? [...prev, id] : prev.filter((i) => i !== id),
+              );
+            }}
+            onSelectAll={(checked) => {
+              setSelectedIds(checked ? assignments.map((a) => a.id) : []);
+            }}
           />
           {totalCount > 0 && (
-            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+            <Pagination
+              currentPage={page}
+              totalItems={totalCount}
+              pageSize={limit}
+              onPageChange={setPage}
+              onPageSizeChange={setLimit} // <-- use setLimit from hook
+              pageSizeOptions={[10, 25, 50, 100]}
+              showPageSize={true}
+            />
           )}
-          <div className="text-xs text-[var(--text-tertiary)] text-right">
-            Total: {totalCount} assignment{totalCount !== 1 ? "s" : ""}
-          </div>
         </>
       )}
 
       {/* Modals */}
-      <CreateAssignmentModal isOpen={formModal.isOpen} onClose={formModal.close} onSuccess={handleFormSuccess} initialData={editingAssignment} />
-      <BulkAssignModal isOpen={bulkModal.isOpen} onClose={bulkModal.close} onSuccess={handleBulkSuccess} />
+      <CreateAssignmentModal
+        isOpen={formModal.isOpen}
+        onClose={formModal.close}
+        onSuccess={handleFormSuccess}
+        initialData={editingAssignment}
+      />
+      <BulkAssignModal
+        isOpen={bulkModal.isOpen}
+        onClose={bulkModal.close}
+        onSuccess={handleBulkSuccess}
+      />
       <ChangeAssignmentStatusModal
         isOpen={statusModal.isOpen}
         onClose={statusModal.close}
@@ -207,7 +375,9 @@ const AssignmentsPage: React.FC = () => {
       <ViewAssignmentModal
         isOpen={assignmentModal.isOpen}
         onClose={() => assignmentModal.close()}
-        assignmentId={assignmentModal.selectedId ? assignmentModal.selectedId : null}
+        assignmentId={
+          assignmentModal.selectedId ? assignmentModal.selectedId : null
+        }
       />
     </div>
   );

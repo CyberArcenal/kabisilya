@@ -30,8 +30,11 @@ export type AssignmentsResponse = ApiResponse<PaginatedResponse<Assignment>>;
 export type AssignmentStatsResponse = ApiResponse<AssignmentStats>;
 
 export interface AssignmentStats {
-  totalAssignments: number;
-  statusBreakdown: Record<string, number>;
+  total: number;
+  active: number;
+  completed: number;
+  cancelled: number;
+  initiated: number;
   totalLuwang: number;
 }
 
@@ -69,7 +72,12 @@ class AssignmentAPI {
   private toPaginatedResponse<T>(backendResult: any): PaginatedResponse<T> {
     return {
       items: backendResult?.data || [],
-      pagination: backendResult?.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+      pagination: backendResult?.pagination || {
+        page: 1,
+        limit: 50,
+        total: 0,
+        pages: 0,
+      },
     };
   }
 
@@ -96,7 +104,10 @@ class AssignmentAPI {
   async getById(id: number): Promise<AssignmentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<AssignmentResponse>("getAssignmentById", { id });
+      const response = await this.call<AssignmentResponse>(
+        "getAssignmentById",
+        { id },
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch assignment");
     } catch (error: any) {
@@ -125,9 +136,14 @@ class AssignmentAPI {
     return this.getAll({ ...params, sessionId });
   }
 
-  async getStats(sessionId?: number): Promise<AssignmentStatsResponse> {
+  async getStats(
+    filters?: AssignmentFilters,
+  ): Promise<AssignmentStatsResponse> {
     try {
-      const response = await this.call<AssignmentStatsResponse>("getAssignmentStats", { sessionId });
+      const response = await this.call<AssignmentStatsResponse>(
+        "getAssignmentStats",
+        { filters },
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
     } catch (error: any) {
@@ -146,7 +162,10 @@ class AssignmentAPI {
     status?: string;
   }): Promise<AssignmentResponse> {
     try {
-      const response = await this.call<AssignmentResponse>("createAssignment", data);
+      const response = await this.call<AssignmentResponse>(
+        "createAssignment",
+        data,
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to create assignment");
     } catch (error: any) {
@@ -220,7 +239,9 @@ class AssignmentAPI {
   async delete(id: number): Promise<AssignmentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<AssignmentResponse>("deleteAssignment", { id });
+      const response = await this.call<AssignmentResponse>("deleteAssignment", {
+        id,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to delete assignment");
     } catch (error: any) {
@@ -231,7 +252,10 @@ class AssignmentAPI {
   async restore(id: number): Promise<AssignmentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<AssignmentResponse>("restoreAssignment", { id });
+      const response = await this.call<AssignmentResponse>(
+        "restoreAssignment",
+        { id },
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to restore assignment");
     } catch (error: any) {

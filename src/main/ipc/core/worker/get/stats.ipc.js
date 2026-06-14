@@ -2,6 +2,7 @@
 const Assignment = require("../../../../../entities/Assignment");
 const Debt = require("../../../../../entities/Debt");
 const Payment = require("../../../../../entities/Payment");
+const Worker = require("../../../../../entities/Worker");
 const workerService = require("../../../../../services/WorkerService");
 const { logger } = require("../../../../../utils/logger");
 const { AppDataSource } = require("../../../../db/data-source");

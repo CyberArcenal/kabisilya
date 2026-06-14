@@ -4,9 +4,10 @@ import { useSearchParams } from "react-router-dom";
 import { useModal } from "../../../../hooks/useModal";
 import { dialogs } from "../../../../utils/dialogs";
 import type { AssignmentWithDetails, AssignmentFormData } from "../types";
-import assignmentAPI from "../../../../api/core/assignment";
+import assignmentAPI, {
+  type AssignmentStats,
+} from "../../../../api/core/assignment";
 
-const PAGE_SIZE = 10;
 const DEBOUNCE_MS = 300;
 
 export const useAssignments = () => {
@@ -19,11 +20,32 @@ export const useAssignments = () => {
     const p = searchParams.get("page");
     return p ? parseInt(p, 10) : 1;
   });
+  const [limit, setLimitState] = useState(() => {
+    const l = searchParams.get("limit");
+    return l ? parseInt(l, 10) : 10;
+  });
+  const [sortBy, setSortBy] = useState(
+    () => searchParams.get("sortBy") || "assignmentDate",
+  );
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">(
+    () => (searchParams.get("sortOrder") as "ASC" | "DESC") || "DESC",
+  );
+  const [stats, setStats] = useState<AssignmentStats>({
+    total: 0,
+    active: 0,
+    completed: 0,
+    totalLuwang: 0,
+    cancelled: 0,
+    initiated: 0,
+  });
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
   // Filters (initialized from URL)
-  const [search, setSearchState] = useState(() => searchParams.get("search") || "");
+  const [search, setSearchState] = useState(
+    () => searchParams.get("search") || "",
+  );
   const [workerId, setWorkerIdState] = useState<number | undefined>(() => {
     const id = searchParams.get("worker");
     return id ? parseInt(id, 10) : undefined;
@@ -36,14 +58,24 @@ export const useAssignments = () => {
     const id = searchParams.get("session");
     return id ? parseInt(id, 10) : undefined;
   });
-  const [status, setStatusState] = useState(() => searchParams.get("status") || "");
-  const [startDate, setStartDateState] = useState(() => searchParams.get("startDate") || "");
-  const [endDate, setEndDateState] = useState(() => searchParams.get("endDate") || "");
+  const [status, setStatusState] = useState(
+    () => searchParams.get("status") || "",
+  );
+  const [startDate, setStartDateState] = useState(
+    () => searchParams.get("startDate") || "",
+  );
+  const [endDate, setEndDateState] = useState(
+    () => searchParams.get("endDate") || "",
+  );
 
   // Selected for modals
-  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null);
-  const [editingAssignment, setEditingAssignment] = useState<(AssignmentFormData & { id: number }) | null>(null);
-  const [statusChangeAssignment, setStatusChangeAssignment] = useState<AssignmentWithDetails | null>(null);
+  const [selectedAssignment, setSelectedAssignment] =
+    useState<AssignmentWithDetails | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<
+    (AssignmentFormData & { id: number }) | null
+  >(null);
+  const [statusChangeAssignment, setStatusChangeAssignment] =
+    useState<AssignmentWithDetails | null>(null);
 
   // Modals
   const viewModal = useModal();
@@ -74,7 +106,7 @@ export const useAssignments = () => {
       newSessionId: number | undefined,
       newStatus: string,
       newStartDate: string,
-      newEndDate: string
+      newEndDate: string,
     ) => {
       const params: Record<string, string> = {};
       if (newSearch) params.search = newSearch;
@@ -87,7 +119,7 @@ export const useAssignments = () => {
       if (newPage > 1) params.page = newPage.toString();
       setSearchParams(params, { replace: true });
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   // Sync URL changes (browser back/forward) to state
@@ -144,21 +176,40 @@ export const useAssignments = () => {
   const setPage = (newPage: number) => {
     if (newPage === page) return;
     setPageState(newPage);
-    updateUrl(newPage, search, workerId, pitakId, sessionId, status, startDate, endDate);
+    updateUrl(
+      newPage,
+      search,
+      workerId,
+      pitakId,
+      sessionId,
+      status,
+      startDate,
+      endDate,
+    );
   };
 
   const setSearch = (val: string) => {
     setSearchState(val);
     if (debounceRefs.search.current) clearTimeout(debounceRefs.search.current);
     debounceRefs.search.current = setTimeout(() => {
-      updateUrl(1, val, workerId, pitakId, sessionId, status, startDate, endDate);
+      updateUrl(
+        1,
+        val,
+        workerId,
+        pitakId,
+        sessionId,
+        status,
+        startDate,
+        endDate,
+      );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
 
   const setWorkerId = (val: number | undefined) => {
     setWorkerIdState(val);
-    if (debounceRefs.workerId.current) clearTimeout(debounceRefs.workerId.current);
+    if (debounceRefs.workerId.current)
+      clearTimeout(debounceRefs.workerId.current);
     debounceRefs.workerId.current = setTimeout(() => {
       updateUrl(1, search, val, pitakId, sessionId, status, startDate, endDate);
       setPageState(1);
@@ -167,16 +218,27 @@ export const useAssignments = () => {
 
   const setPitakId = (val: number | undefined) => {
     setPitakIdState(val);
-    if (debounceRefs.pitakId.current) clearTimeout(debounceRefs.pitakId.current);
+    if (debounceRefs.pitakId.current)
+      clearTimeout(debounceRefs.pitakId.current);
     debounceRefs.pitakId.current = setTimeout(() => {
-      updateUrl(1, search, workerId, val, sessionId, status, startDate, endDate);
+      updateUrl(
+        1,
+        search,
+        workerId,
+        val,
+        sessionId,
+        status,
+        startDate,
+        endDate,
+      );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
 
   const setSessionId = (val: number | undefined) => {
     setSessionIdState(val);
-    if (debounceRefs.sessionId.current) clearTimeout(debounceRefs.sessionId.current);
+    if (debounceRefs.sessionId.current)
+      clearTimeout(debounceRefs.sessionId.current);
     debounceRefs.sessionId.current = setTimeout(() => {
       updateUrl(1, search, workerId, pitakId, val, status, startDate, endDate);
       setPageState(1);
@@ -187,14 +249,24 @@ export const useAssignments = () => {
     setStatusState(val);
     if (debounceRefs.status.current) clearTimeout(debounceRefs.status.current);
     debounceRefs.status.current = setTimeout(() => {
-      updateUrl(1, search, workerId, pitakId, sessionId, val, startDate, endDate);
+      updateUrl(
+        1,
+        search,
+        workerId,
+        pitakId,
+        sessionId,
+        val,
+        startDate,
+        endDate,
+      );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
 
   const setStartDate = (val: string) => {
     setStartDateState(val);
-    if (debounceRefs.startDate.current) clearTimeout(debounceRefs.startDate.current);
+    if (debounceRefs.startDate.current)
+      clearTimeout(debounceRefs.startDate.current);
     debounceRefs.startDate.current = setTimeout(() => {
       updateUrl(1, search, workerId, pitakId, sessionId, status, val, endDate);
       setPageState(1);
@@ -203,9 +275,19 @@ export const useAssignments = () => {
 
   const setEndDate = (val: string) => {
     setEndDateState(val);
-    if (debounceRefs.endDate.current) clearTimeout(debounceRefs.endDate.current);
+    if (debounceRefs.endDate.current)
+      clearTimeout(debounceRefs.endDate.current);
     debounceRefs.endDate.current = setTimeout(() => {
-      updateUrl(1, search, workerId, pitakId, sessionId, status, startDate, val);
+      updateUrl(
+        1,
+        search,
+        workerId,
+        pitakId,
+        sessionId,
+        status,
+        startDate,
+        val,
+      );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
@@ -228,7 +310,7 @@ export const useAssignments = () => {
     return () => {
       isMountedRef.current = false;
       abortControllerRef.current?.abort();
-      Object.values(debounceRefs).forEach(ref => {
+      Object.values(debounceRefs).forEach((ref) => {
         if (ref.current) clearTimeout(ref.current);
       });
     };
@@ -246,7 +328,7 @@ export const useAssignments = () => {
     try {
       const params: any = {
         page,
-        limit: PAGE_SIZE,
+        limit: limit,
         sortBy: "assignmentDate",
         sortOrder: "DESC",
       };
@@ -260,7 +342,8 @@ export const useAssignments = () => {
 
       const res = await assignmentAPI.getAll(params);
       if (controller.signal.aborted || !isMountedRef.current) return;
-      if (!res.status) throw new Error(res.message || "Failed to fetch assignments");
+      if (!res.status)
+        throw new Error(res.message || "Failed to fetch assignments");
 
       setAssignments(res.data.items);
       setTotalCount(res.data.pagination.total);
@@ -273,7 +356,7 @@ export const useAssignments = () => {
         setLoading(false);
       }
     }
-  }, [page, search, workerId, pitakId, sessionId, status, startDate, endDate]);
+  }, [page, limit, sortBy, sortOrder, search, workerId, pitakId, sessionId, status, startDate, endDate]);
 
   useEffect(() => {
     fetchAssignments();
@@ -306,7 +389,7 @@ export const useAssignments = () => {
       workerId: assignment.worker?.id || 0,
       pitakId: assignment.pitak?.id || 0,
       sessionId: assignment.session?.id || 0,
-      assignmentDate: assignment.assignmentDate.split("T")[0],
+      assignmentDate: assignment.assignmentDate?.split("T")[0],
       notes: assignment.notes || "",
       status: assignment.status,
     });
@@ -341,14 +424,179 @@ export const useAssignments = () => {
     setStatusChangeAssignment(null);
   };
 
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await assignmentAPI.getStats({
+        workerId,
+        pitakId,
+        sessionId,
+        status,
+        startDate,
+        endDate,
+        search,
+      });
+      if (res.status) {
+        setStats(res.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch assignment stats", error);
+    }
+  }, [workerId, pitakId, sessionId, status, startDate, endDate, search]);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  // Add bulk actions
+  const bulkDelete = async (ids: number[]) => {
+    const confirmed = await dialogs.confirm({
+      title: "Bulk Delete",
+      message: `Delete ${ids.length} assignments?`,
+      icon: "danger",
+    });
+    if (!confirmed) return;
+    await Promise.all(ids.map((id) => assignmentAPI.delete(id)));
+    await fetchAssignments();
+    setSelectedIds([]);
+  };
+
+  const bulkStatusChange = async (ids: number[], newStatus: string) => {
+    const confirmed = await dialogs.confirm({
+      title: "Bulk Status Change",
+      message: `Change ${ids.length} assignments to ${newStatus}?`,
+    });
+    if (!confirmed) return;
+    await Promise.all(
+      ids.map((id) => assignmentAPI.updateStatus(id, newStatus)),
+    );
+    await fetchAssignments();
+    setSelectedIds([]);
+  };
+
+  const exportToCSV = async () => {
+    const params: any = {
+      limit: 10000,
+      workerId,
+      pitakId,
+      sessionId,
+      status,
+      startDate,
+      endDate,
+      search,
+      sortBy,
+      sortOrder,
+    };
+    const res = await assignmentAPI.getAll(params);
+    if (res.status && res.data.items.length) {
+      const items = res.data.items;
+      const headers = [
+        "ID",
+        "Worker",
+        "Plot",
+        "Session",
+        "Luwang",
+        "Assignment Date",
+        "Status",
+        "Notes",
+        "Created At",
+      ];
+      const rows = items.map((a) => [
+        a.id,
+        a.worker?.name || "",
+        a.pitak?.location || "",
+        a.session?.name || "",
+        a.luwangCount,
+        new Date(a.assignmentDate).toLocaleDateString(),
+        a.status,
+        a.notes || "",
+        new Date(a.createdAt).toLocaleDateString(),
+      ]);
+      const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `assignments_export_${new Date().toISOString().slice(0, 19)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      dialogs.error("No data to export");
+    }
+  };
+
+  const bulkExport = () => {
+    const selected = assignments.filter((a) => selectedIds.includes(a.id));
+    if (selected.length === 0) return;
+    const headers = [
+      "ID",
+      "Worker",
+      "Plot",
+      "Session",
+      "Luwang",
+      "Assignment Date",
+      "Status",
+      "Notes",
+    ];
+    const rows = selected.map((a) => [
+      a.id,
+      a.worker?.name || "",
+      a.pitak?.location || "",
+      a.session?.name || "",
+      a.luwangCount,
+      new Date(a.assignmentDate).toLocaleDateString(),
+      a.status,
+      a.notes || "",
+    ]);
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `selected_assignments_${new Date().toISOString().slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const setSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortBy(field);
+      setSortOrder("DESC");
+    }
+    setPage(1);
+  };
+
   return {
     assignments,
     loading,
     page,
     totalPages,
     totalCount,
-    filters: { search, workerId, pitakId, sessionId, status, startDate, endDate },
+    filters: {
+      search,
+      workerId,
+      pitakId,
+      sessionId,
+      status,
+      startDate,
+      endDate,
+    },
+    limit,
+    setLimitState,
+    setLimit: setLimitState,
+    sortBy,
+    sortOrder,
+    setSortOrder,
+    stats,
+    selectedIds,
+    setSelectedIds,
+    bulkDelete,
+    bulkStatusChange,
+    bulkExport,
+    exportToCSV,
     setPage,
+    setSort,
     setSearch,
     setWorkerId,
     setPitakId,
