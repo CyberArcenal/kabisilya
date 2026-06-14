@@ -16,6 +16,7 @@ import { useDynamicWeather } from "../../../hooks/useDynamicWeather";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import UpdateNotifier from "../../../components/Shared/UpdateNotifier";
 import ThemeToggle from "../../../components/Shared/ThemeToggle";
+import StatusIndicators from "../../../components/Shared/StatusIndicators";
 
 const TopBarRight: React.FC = () => {
   const navigate = useNavigate();
@@ -73,6 +74,7 @@ const TopBarRight: React.FC = () => {
 
   return (
     <div className="flex items-center gap-3">
+       <StatusIndicators />
       {/* Weather widget with dropdown */}
       <div className="relative hidden lg:block">
         <div

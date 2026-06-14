@@ -7,8 +7,8 @@
  * @class
  * @implements {MigrationInterface}
  */
-module.exports = class InitSchema1781355916942 {
-    name = 'InitSchema1781355916942'
+module.exports = class InitSchema1781415764900 {
+    name = 'InitSchema1781415764900'
 
     /**
      * @param {QueryRunner} queryRunner

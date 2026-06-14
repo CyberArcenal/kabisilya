@@ -29,6 +29,8 @@ const PaymentHistoryPage: React.FC = () => {
     resetFilters,
   } = usePaymentHistory();
 
+  // console.log(history)
+
   const hasFilters = !!(filters.paymentId || filters.actionType || filters.startDate || filters.endDate);
 
   return (

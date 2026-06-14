@@ -1,4 +1,4 @@
-// src/components/Selects/SearchableSelect.tsx
+// src/components/Selects/shared/SearchableSelect.tsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Search, ChevronDown, X } from "lucide-react";
@@ -41,32 +41,20 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Refs to prevent infinite loops
   const initialLoadedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fetchOptionsRef = useRef(fetchOptions);
 
-  // Load initial options – runs only once on mount, or when fetchOptions reference changes
   useEffect(() => {
-    // Skip if already loaded and fetchOptions hasn't changed
-    if (initialLoadedRef.current && fetchOptionsRef.current === fetchOptions) {
-      return;
-    }
-
-    // Update stored fetchOptions reference
+    if (initialLoadedRef.current && fetchOptionsRef.current === fetchOptions) return;
     fetchOptionsRef.current = fetchOptions;
-
     const load = async () => {
-      // Cancel previous request
       abortControllerRef.current?.abort();
       const controller = new AbortController();
       abortControllerRef.current = controller;
-
       setLoading(true);
       try {
         const opts = await fetchOptions("");
-        // Check if this request is still valid
         if (controller.signal.aborted) return;
         setOptions(opts);
         setFiltered(opts);
@@ -78,26 +66,19 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         setLoading(false);
       }
     };
-
-    // Only load if we don't have initialOptions provided, or if we need to refresh
     if (initialOptions.length === 0 || !initialLoadedRef.current) {
       load();
     } else {
-      // If initialOptions were provided, use them and mark as loaded
       setOptions(initialOptions);
       setFiltered(initialOptions);
       initialLoadedRef.current = true;
     }
-  }, [fetchOptions, initialOptions]); // Still depends, but guarded by refs
+  }, [fetchOptions, initialOptions]);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
+    return () => abortControllerRef.current?.abort();
   }, []);
 
-  // Filter on search term
   useEffect(() => {
     if (!searchTerm.trim()) {
       setFiltered(options);
@@ -107,7 +88,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     setFiltered(options.filter((opt) => opt.label.toLowerCase().includes(lower)));
   }, [searchTerm, options]);
 
-  // Focus when dropdown opens
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -137,7 +117,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     };
   }, [isOpen, updatePosition]);
 
-  // Close on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -153,7 +132,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Keyboard: Escape closes
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,7 +164,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className="w-full px-4 py-2 rounded-xl text-left flex items-center gap-2 transition-all duration-200 border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+        className="w-full px-4 py-2 rounded-xl text-left flex items-center gap-2 transition-all duration-200 border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] h-10"
         style={{
           backgroundColor: "var(--input-bg)",
           borderColor: "var(--input-border)",
@@ -197,14 +175,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         {icon && <div className="flex-shrink-0" style={{ color: "var(--primary-color)" }}>{icon}</div>}
         <div className="flex-1 min-w-0 truncate">
           {selectedOption ? (
-            <span className="font-medium">{selectedOption.label}</span>
+            <span className="font-medium truncate block">{selectedOption.label}</span>
           ) : (
-            <span style={{ color: "var(--text-tertiary)" }}>{placeholder}</span>
-          )}
-          {selectedOption?.subLabel && (
-            <div className="text-xs truncate" style={{ color: "var(--text-tertiary)" }}>
-              {selectedOption.subLabel}
-            </div>
+            <span className="truncate block" style={{ color: "var(--text-tertiary)" }}>{placeholder}</span>
           )}
         </div>
         {selectedOption && !disabled && (
@@ -261,38 +234,24 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             </div>
             <div className="overflow-y-auto" style={{ maxHeight: "280px" }}>
               {loading && options.length === 0 && (
-                <div className="p-3 text-center text-sm" style={{ color: "var(--text-secondary)" }}>
-                  Loading...
-                </div>
+                <div className="p-3 text-center text-sm" style={{ color: "var(--text-secondary)" }}>Loading...</div>
               )}
               {!loading && filtered.length === 0 && (
-                <div className="p-3 text-center text-sm" style={{ color: "var(--text-tertiary)" }}>
-                  No results
-                </div>
+                <div className="p-3 text-center text-sm" style={{ color: "var(--text-tertiary)" }}>No results</div>
               )}
               {filtered.map((opt) => (
                 <button
                   key={opt.id}
                   onClick={() => handleSelect(opt)}
                   className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors text-sm cursor-pointer hover:bg-[var(--card-hover-bg)] ${
-                    opt.id === value
-                      ? "bg-[var(--primary-light)] dark:bg-[var(--primary-color)]/20"
-                      : ""
+                    opt.id === value ? "bg-[var(--primary-light)] dark:bg-[var(--primary-color)]/20" : ""
                   }`}
                   style={{ borderBottom: "1px solid var(--border-color)" }}
                 >
-                  {opt.icon && (
-                    <div className="flex-shrink-0" style={{ color: "var(--primary-color)" }}>
-                      {opt.icon}
-                    </div>
-                  )}
+                  {opt.icon && <div className="flex-shrink-0" style={{ color: "var(--primary-color)" }}>{opt.icon}</div>}
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{opt.label}</div>
-                    {opt.subLabel && (
-                      <div className="text-xs truncate mt-0.5" style={{ color: "var(--text-tertiary)" }}>
-                        {opt.subLabel}
-                      </div>
-                    )}
+                    {opt.subLabel && <div className="text-xs truncate mt-0.5" style={{ color: "var(--text-tertiary)" }}>{opt.subLabel}</div>}
                   </div>
                 </button>
               ))}

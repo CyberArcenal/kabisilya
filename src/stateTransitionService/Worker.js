@@ -36,7 +36,7 @@ class WorkerStateTransitionService {
         if (assignment.status === "active" && !assignment.deletedAt) {
           assignment.status = "cancelled";
           assignment.updatedAt = new Date();
-          await updateDb(assignmentRepo, assignment, { queryRunner: qr, skipSignal: true });
+          await updateDb(assignmentRepo, assignment, { queryRunner: qr, skipSignal: false });
           logger.info(`[WorkerTransition] Cancelled active assignment #${assignment.id} due to worker termination.`);
         }
       }

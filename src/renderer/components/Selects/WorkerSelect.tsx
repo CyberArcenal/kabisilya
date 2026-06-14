@@ -6,7 +6,7 @@ import workerAPI from "../../api/core/worker";
 
 interface WorkerSelectProps {
   value: number | null;
-  onChange: (id: number | null) => void;
+  onChange: (id: number | null, option?: Option) => void;
   disabled?: boolean;
   placeholder?: string;
 }

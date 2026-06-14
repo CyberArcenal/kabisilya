@@ -1,6 +1,6 @@
 // src/renderer/pages/farms/assignments/index.tsx
 import React from "react";
-import { Plus, Filter, X, Users } from "lucide-react";
+import { Plus, Filter, X, Users, RefreshCw } from "lucide-react"; // added RefreshCw
 import Button from "../../../components/UI/Button";
 import Pagination from "../../../components/UI/Pagination";
 import LoadingSpinner from "../../../components/Shared/LoadingSpinner";
@@ -56,6 +56,7 @@ const AssignmentsPage: React.FC = () => {
     handleFormSuccess,
     handleBulkSuccess,
     resetFilters,
+    refetch, // <-- added
   } = useAssignments();
 
   const hasFilters = !!(
@@ -71,7 +72,6 @@ const AssignmentsPage: React.FC = () => {
   const assignmentModal = useModal();
 
   const handleViewAssignment = (assignment: AssignmentWithDetails) => {
-    // Simple alert for now; could open a view modal
     assignmentModal.setSelected(assignment.id);
     assignmentModal.open();
   };
@@ -81,134 +81,88 @@ const AssignmentsPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-            Assignments
-          </h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Manage worker assignments to plots
-          </p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Assignments</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Manage worker assignments to plots</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            size="md"
-            icon={Users}
-            onClick={bulkModal.open}
-          >
+          <Button variant="secondary" size="md" icon={Users} onClick={bulkModal.open}>
             Bulk Assign
           </Button>
-          <Button
-            variant="primary"
-            size="md"
-            icon={Plus}
-            onClick={handleAddNew}
-          >
+          <Button variant="primary" size="md" icon={Plus} onClick={handleAddNew}>
             Add Assignment
           </Button>
         </div>
       </div>
 
-      {/* Filters Bar (inline) */}
+      {/* Filters Bar */}
       <div className="bg-[var(--card-bg)] rounded-xl p-4 border border-[var(--border-color)] space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
-          <Filter className="w-4 h-4" /> Filters
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+            <Filter className="w-4 h-4" /> Filters
+          </div>
+          <button
+            onClick={refetch}
+            disabled={loading}
+            className="p-1.5 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors text-[var(--text-secondary)]"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <input
             type="text"
             placeholder="Search worker or plot..."
             value={filters.search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{
-              backgroundColor: "var(--input-bg)",
-              borderColor: "var(--input-border)",
-              color: "var(--text-primary)",
-            }}
+            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
           />
           <WorkerSelect
             value={filters.workerId || null}
-            onChange={(id) => {
-              setWorkerId(id || undefined);
-              setPage(1);
-            }}
+            onChange={(id) => { setWorkerId(id || undefined); setPage(1); }}
             placeholder="All workers"
           />
           <PitakSelect
             value={filters.pitakId || null}
-            onChange={(id) => {
-              setPitakId(id || undefined);
-              setPage(1);
-            }}
+            onChange={(id) => { setPitakId(id || undefined); setPage(1); }}
             placeholder="All plots"
           />
           <SessionSelect
             value={filters.sessionId || null}
-            onChange={(id) => {
-              setSessionId(id || undefined);
-              setPage(1);
-            }}
+            onChange={(id) => { setSessionId(id || undefined); setPage(1); }}
             placeholder="All sessions"
           />
           <select
             value={filters.status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{
-              backgroundColor: "var(--input-bg)",
-              borderColor: "var(--input-border)",
-              color: "var(--text-primary)",
-            }}
+            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
           >
             {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
           <input
             type="date"
             placeholder="Start date"
             value={filters.startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{
-              backgroundColor: "var(--input-bg)",
-              borderColor: "var(--input-border)",
-              color: "var(--text-primary)",
-            }}
+            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
           />
           <input
             type="date"
             placeholder="End date"
             value={filters.endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
             className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{
-              backgroundColor: "var(--input-bg)",
-              borderColor: "var(--input-border)",
-              color: "var(--text-primary)",
-            }}
+            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
           />
         </div>
         {hasFilters && (
           <div className="flex justify-end">
-            <button
-              onClick={resetFilters}
-              className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1"
-            >
+            <button onClick={resetFilters} className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1">
               <X className="w-3 h-3" /> Clear all filters
             </button>
           </div>
@@ -217,9 +171,7 @@ const AssignmentsPage: React.FC = () => {
 
       {/* Table */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <LoadingSpinner size="medium" />
-        </div>
+        <div className="flex justify-center py-12"><LoadingSpinner size="medium" /></div>
       ) : (
         <>
           <AssignmentTable
@@ -229,11 +181,9 @@ const AssignmentsPage: React.FC = () => {
             onDelete={handleDelete}
             onChangeStatus={handleChangeStatus}
           />
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
+          {totalCount > 0 && (
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          )}
           <div className="text-xs text-[var(--text-tertiary)] text-right">
             Total: {totalCount} assignment{totalCount !== 1 ? "s" : ""}
           </div>
@@ -241,17 +191,8 @@ const AssignmentsPage: React.FC = () => {
       )}
 
       {/* Modals */}
-      <CreateAssignmentModal
-        isOpen={formModal.isOpen}
-        onClose={formModal.close}
-        onSuccess={handleFormSuccess}
-        initialData={editingAssignment}
-      />
-      <BulkAssignModal
-        isOpen={bulkModal.isOpen}
-        onClose={bulkModal.close}
-        onSuccess={handleBulkSuccess}
-      />
+      <CreateAssignmentModal isOpen={formModal.isOpen} onClose={formModal.close} onSuccess={handleFormSuccess} initialData={editingAssignment} />
+      <BulkAssignModal isOpen={bulkModal.isOpen} onClose={bulkModal.close} onSuccess={handleBulkSuccess} />
       <ChangeAssignmentStatusModal
         isOpen={statusModal.isOpen}
         onClose={statusModal.close}
@@ -265,12 +206,8 @@ const AssignmentsPage: React.FC = () => {
       />
       <ViewAssignmentModal
         isOpen={assignmentModal.isOpen}
-        onClose={() => {
-          assignmentModal.close();
-        }}
-        assignmentId={
-          assignmentModal.selectedId ? assignmentModal.selectedId : null
-        }
+        onClose={() => assignmentModal.close()}
+        assignmentId={assignmentModal.selectedId ? assignmentModal.selectedId : null}
       />
     </div>
   );

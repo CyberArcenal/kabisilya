@@ -26,11 +26,33 @@ export interface SystemSettingData {
   updated_at?: string;
 }
 
+export interface FarmNotificationsSettings {
+  email_enabled?: boolean;
+  email_smtp_host?: string;
+  email_smtp_port?: number;
+  email_from_address?: string;
+  email_smtp_username?: string;
+  email_smtp_password?: string;
+  sms_enabled?: boolean;
+  sms_provider?: string; // e.g., "twilio"
+  reminder_days_before_due?: number[]; // days before due to send reminders
+  overdue_notification_frequency?: "daily" | "weekly";
+  notify_on_payment?: boolean; // notify debtor when payment is recorded
+  notify_on_penalty?: boolean; // notify when penalty is applied
+
+  // Twilio settings
+  twilio_account_sid?: string;
+  twilio_auth_token?: string;
+  twilio_phone_number?: string;
+  twilio_messaging_service_sid?: string;
+}
+
 export interface GroupedSettingsData {
   settings: SystemSettingData[];
   grouped_settings: {
     general: GeneralSettings;
     farm_session: FarmSessionSettings;
+    notification: FarmNotificationsSettings;
     farm_bukid: FarmBukidSettings;
     farm_pitak: FarmPitakSettings;
     farm_assignment: FarmAssignmentSettings;
@@ -284,7 +306,7 @@ class SystemConfigAPI {
 
       const response = await window.backendAPI.systemConfig({
         method: "updateGroupedConfig",
-        params: { configData: JSON.stringify(configData) }, // Baguhin ito
+        params: { configData },
       });
 
       if (response.status) {

@@ -66,10 +66,10 @@ class PaymentHistoryAPI {
     return window.backendAPI.paymentHistory({ method, params });
   }
 
-  private toPaginatedResponse<T>(raw: any): PaginatedResponse<T> {
+  private toPaginatedResponse<T>(data: T[], pagination: any): PaginatedResponse<T> {
     return {
-      items: raw.data || [],
-      pagination: raw.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+      items: data || [],
+      pagination: pagination || { page: 1, limit: 50, total: 0, pages: 0 },
     };
   }
 
@@ -80,7 +80,7 @@ class PaymentHistoryAPI {
         return {
           status: true,
           message: response.message,
-          data: this.toPaginatedResponse<PaymentHistory>(response.data),
+          data: this.toPaginatedResponse<PaymentHistory>(response.data || [], response.pagination),
         };
       }
       throw new Error(response.message || "Failed to fetch payment histories");

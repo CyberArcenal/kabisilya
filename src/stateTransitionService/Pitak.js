@@ -36,7 +36,7 @@ class PitakStateTransitionService {
         assignment.status = "completed";
         assignment.updatedAt = new Date();
         try {
-          await updateDb(assignmentRepo, assignment, { queryRunner: qr, skipSignal: true });
+          await updateDb(assignmentRepo, assignment, { queryRunner: qr, skipSignal: false });
           await auditLogger.logUpdate("Assignment", assignment.id, { status: oldAssignmentStatus }, { status: "completed" }, user);
           logger.info(`[PitakTransition] Assignment #${assignment.id} set to complete due to pitak completion.`);
         } catch (error) {

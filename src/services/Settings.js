@@ -292,7 +292,8 @@ class SystemSettingService {
           );
           results.updated.push({ category, key, id: saved.id });
         } catch (err) {
-          results.errors.push({ category, key, error: err.message });
+          console.error(`[updateGroupedConfig] Error saving ${category}.${key}:`, err);
+          results.errors.push({ category, key, error: err.message, stack: err.stack });
         }
       }
     }

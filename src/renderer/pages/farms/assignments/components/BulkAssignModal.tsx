@@ -7,6 +7,7 @@ import Modal from "../../../../components/UI/Modal";
 import PitakSelect from "../../../../components/Selects/PitakSelect";
 import { showWarning } from "../../../../utils/notification";
 import { useDefaultSessionId } from "../../../../utils/config/farmConfig";
+import workerAPI from "../../../../api/core/worker";
 
 interface Props {
   isOpen: boolean;
@@ -15,40 +16,71 @@ interface Props {
   initialData?: { pitakId: number; pitakLocation?: string } | null;
 }
 
+interface SelectedWorker {
+  id: number;
+  name: string;
+}
+
 const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
   const defaultSessionId = useDefaultSessionId();
-  const [workerIds, setWorkerIds] = useState<number[]>([]);
+  const [selectedWorkers, setSelectedWorkers] = useState<SelectedWorker[]>([]);
   const [currentWorkerId, setCurrentWorkerId] = useState<number | null>(null);
   const [pitakId, setPitakId] = useState<number>(initialData?.pitakId || 0);
   const [assignmentDate, setAssignmentDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [currentWorkerName, setCurrentWorkerName] = useState<string>("");
 
   // Reset form when modal opens or initialData changes
   useEffect(() => {
     if (isOpen) {
-      setWorkerIds([]);
+      setSelectedWorkers([]);
       setCurrentWorkerId(null);
+      setCurrentWorkerName("");
       setPitakId(initialData?.pitakId || 0);
       setAssignmentDate(new Date().toISOString().split("T")[0]);
       setNotes("");
     }
   }, [isOpen, initialData]);
 
-  const addWorker = () => {
-    if (currentWorkerId && !workerIds.includes(currentWorkerId)) {
-      setWorkerIds([...workerIds, currentWorkerId]);
-      setCurrentWorkerId(null);
+  const addWorker = async () => {
+    if (!currentWorkerId) return;
+    // Check if already added
+    if (selectedWorkers.some(w => w.id === currentWorkerId)) {
+      showWarning("Worker already added.");
+      return;
     }
+    // Fetch worker name if not already known
+    let workerName = currentWorkerName;
+    if (!workerName) {
+      try {
+        const res = await workerAPI.getById(currentWorkerId);
+        if (res.status && res.data) {
+          workerName = res.data.name;
+        } else {
+          workerName = `Worker #${currentWorkerId}`;
+        }
+      } catch {
+        workerName = `Worker #${currentWorkerId}`;
+      }
+    }
+    setSelectedWorkers([...selectedWorkers, { id: currentWorkerId, name: workerName }]);
+    setCurrentWorkerId(null);
+    setCurrentWorkerName("");
   };
 
   const removeWorker = (id: number) => {
-    setWorkerIds(workerIds.filter(wid => wid !== id));
+    setSelectedWorkers(selectedWorkers.filter(w => w.id !== id));
+  };
+
+  const handleWorkerSelect = (id: number | null) => {
+    setCurrentWorkerId(id);
+    setCurrentWorkerName(""); // reset name, will be fetched on add
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (workerIds.length === 0) {
+    if (selectedWorkers.length === 0) {
       showWarning("Please select at least one worker.");
       return;
     }
@@ -63,7 +95,7 @@ const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
     setSubmitting(true);
     try {
       await assignmentAPI.createBulk({
-        workerIds,
+        workerIds: selectedWorkers.map(w => w.id),
         pitakId,
         sessionId: defaultSessionId,
         assignmentDate,
@@ -90,7 +122,7 @@ const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
             <div className="flex-1">
               <WorkerSelect
                 value={currentWorkerId}
-                onChange={(id) => setCurrentWorkerId(id)}
+                onChange={handleWorkerSelect}
                 placeholder="Select a worker to add"
               />
             </div>
@@ -98,12 +130,12 @@ const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
               Add
             </Button>
           </div>
-          {workerIds.length > 0 && (
+          {selectedWorkers.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {workerIds.map((wid) => (
-                <div key={wid} className="flex items-center gap-1 px-2 py-1 bg-[var(--card-secondary-bg)] rounded-full text-sm">
-                  Worker #{wid}
-                  <button type="button" onClick={() => removeWorker(wid)} className="text-red-500 hover:text-red-700 ml-1">
+              {selectedWorkers.map((worker) => (
+                <div key={worker.id} className="flex items-center gap-1 px-2 py-1 bg-[var(--card-secondary-bg)] rounded-full text-sm">
+                  {worker.name}
+                  <button type="button" onClick={() => removeWorker(worker.id)} className="text-red-500 hover:text-red-700 ml-1">
                     ✕
                   </button>
                 </div>
@@ -158,7 +190,7 @@ const BulkAssignModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialD
             loading={submitting}
             disabled={!defaultSessionId}
           >
-            Assign {workerIds.length} Worker{workerIds.length !== 1 ? "s" : ""}
+            Assign {selectedWorkers.length} Worker{selectedWorkers.length !== 1 ? "s" : ""}
           </Button>
         </div>
         {!defaultSessionId && (

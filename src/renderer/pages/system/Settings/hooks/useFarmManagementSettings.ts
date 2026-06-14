@@ -8,325 +8,302 @@ import systemConfigAPI, {
   type FarmPaymentSettings,
   type FarmDebtSettings,
   type FarmAuditSettings,
+  type FarmNotificationsSettings,
 } from "../../../../api/utils/system_config";
 import { useSettings } from "../../../../contexts/SettingsContext";
-import { showError, showSuccess } from "../../../../utils/notification";
+import { dialogs } from "../../../../utils/dialogs";
 
-
-interface FarmManagementSettings {
-  farm_session: FarmSessionSettings;
-  farm_bukid: FarmBukidSettings;
-  farm_pitak: FarmPitakSettings;
-  farm_assignment: FarmAssignmentSettings;
-  farm_payment: FarmPaymentSettings;
-  farm_debt: FarmDebtSettings;
-  farm_audit: FarmAuditSettings;
-}
-
-interface UseFarmManagementSettingsReturn {
-  settings: FarmManagementSettings | null;
-  loading: boolean;
-  error: string | null;
-  saving: boolean;
-  saveSuccess: boolean;
-  saveError: string | null;
-  fetchSettings: () => Promise<void>;
-  updateSettings: (
-    newSettings: Partial<FarmManagementSettings>,
-  ) => Promise<void>;
-  updateFormSettings: (
-    category: keyof FarmManagementSettings,
-    newSettings: any,
-  ) => void;
-  resetForm: () => void;
-  hasChanges: boolean;
-}
-
-// Enhanced deep comparison utility function with type normalization
-const deepEqual = (obj1: any, obj2: any): boolean => {
-  if (obj1 === obj2) return true;
-
-  // Handle primitive types and null/undefined
-  if (obj1 == null || obj2 == null) {
-    // For boolean-like comparisons, treat undefined/null/false as equivalent
-    if ((obj1 == null && obj2 === false) || (obj1 === false && obj2 == null)) {
-      return true;
-    }
-    return obj1 == obj2;
-  }
-
-  if (typeof obj1 !== "object" || typeof obj2 !== "object") {
-    // Handle number/string comparisons
-    if (typeof obj1 === "number" && typeof obj2 === "number") {
-      // Special case for 0 and empty values
-      if ((obj1 === 0 && !obj2) || (obj2 === 0 && !obj1)) {
-        return false;
-      }
-    }
-    return obj1 === obj2;
-  }
-
-  // Handle array comparisons
-  if (Array.isArray(obj1) !== Array.isArray(obj2)) {
-    return false;
-  }
-
-  if (Array.isArray(obj1) && Array.isArray(obj2)) {
-    if (obj1.length !== obj2.length) return false;
-    for (let i = 0; i < obj1.length; i++) {
-      if (!deepEqual(obj1[i], obj2[i])) return false;
-    }
-    return true;
-  }
-
-  // Handle object comparisons
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
-
-  // Get all unique keys
-  const allKeys = new Set([...keys1, ...keys2]);
-
-  for (const key of allKeys) {
-    const val1 = obj1[key];
-    const val2 = obj2[key];
-
-    if (!deepEqual(val1, val2)) {
-      return false;
-    }
-  }
-
-  return true;
+// Default values for each farm category
+const DEFAULT_FARM_SESSION: FarmSessionSettings = {};
+const DEFAULT_FARM_BUKID: FarmBukidSettings = {};
+const DEFAULT_FARM_PITAK: FarmPitakSettings = {};
+const DEFAULT_FARM_ASSIGNMENT: FarmAssignmentSettings = {};
+const DEFAULT_FARM_PAYMENT: FarmPaymentSettings = {};
+const DEFAULT_FARM_DEBT: FarmDebtSettings = {};
+const DEFAULT_FARM_AUDIT: FarmAuditSettings = {};
+const DEFAULT_NOTIFICATION: FarmNotificationsSettings = {
+  email_enabled: false,
+  email_smtp_host: "",
+  email_smtp_port: 587,
+  email_from_address: "",
+  email_smtp_username: "",
+  email_smtp_password: "",
+  sms_enabled: false,
+  sms_provider: "twilio",
+  reminder_days_before_due: [7, 3, 1],
+  overdue_notification_frequency: "daily",
+  notify_on_payment: true,
+  notify_on_penalty: true,
+  twilio_account_sid: "",
+  twilio_auth_token: "",
+  twilio_phone_number: "",
+  twilio_messaging_service_sid: "",
 };
 
-// Function to ensure all boolean fields have consistent values
-const normalizeBooleanFields = (settings: any): any => {
-  if (!settings || typeof settings !== "object") return settings;
+const DEFAULTS = {
+  farm_session: DEFAULT_FARM_SESSION,
+  farm_bukid: DEFAULT_FARM_BUKID,
+  farm_pitak: DEFAULT_FARM_PITAK,
+  farm_assignment: DEFAULT_FARM_ASSIGNMENT,
+  farm_payment: DEFAULT_FARM_PAYMENT,
+  farm_debt: DEFAULT_FARM_DEBT,
+  farm_audit: DEFAULT_FARM_AUDIT,
+  notification: DEFAULT_NOTIFICATION,
+};
 
-  const normalized = { ...settings };
-
-  // List of known boolean fields across all settings categories
-  const booleanFields = [
-    // Session settings
+// Allowed keys per category (must be strings)
+const ALLOWED_KEYS: Record<keyof typeof DEFAULTS, string[]> = {
+  farm_session: [
+    "default_session_id",
+    "season_type",
+    "year",
+    "start_date",
+    "end_date",
+    "status",
+    "notes",
     "require_default_session",
-
-    // Bukid settings
+  ],
+  farm_bukid: [
+    "name_format",
     "enable_location_descriptor",
+    "default_status",
     "location_required",
-
-    // Pitak settings
-    "require_location",
-
-    // Assignment settings
+    "max_bukid_per_session",
+  ],
+  farm_pitak: ["require_location"],
+  farm_assignment: [
+    "default_luwang_per_worker",
+    "date_behavior",
+    "status_options",
     "enable_notes_remarks",
-
-    // Payment settings
-    // (wala na tayong boolean dito dahil rate_per_luwang lang ang laman)
-
-    // Debt settings
+  ],
+  farm_payment: ["rate_per_luwang"],
+  farm_debt: [
+    "debt_allocation_strategy",
+    "default_interest_rate",
+    "payment_term_days",
+    "grace_period_days",
+    "debt_limit",
     "require_debt_reason",
     "auto_apply_interest",
-
-    // Audit settings
+  ],
+  farm_audit: [
     "logActionsEnabled",
+    "auditRetentionDays",
     "enableRealTimeLogging",
     "notifyOnCriticalEvents",
-  ];
-
-  // Recursively normalize objects and arrays
-  const normalizeRecursive = (obj: any): any => {
-    if (!obj || typeof obj !== "object") return obj;
-
-    if (Array.isArray(obj)) {
-      return obj.map((item) => normalizeRecursive(item));
-    }
-
-    const result = { ...obj };
-
-    for (const key in result) {
-      if (booleanFields.includes(key)) {
-        // Ensure boolean fields are boolean, not undefined/null
-        if (result[key] == null) {
-          result[key] = false;
-        } else {
-          result[key] = Boolean(result[key]);
-        }
-      } else if (typeof result[key] === "object") {
-        result[key] = normalizeRecursive(result[key]);
-      }
-    }
-
-    return result;
-  };
-
-  return normalizeRecursive(normalized);
+  ],
+  notification: [
+    "email_enabled",
+    "email_smtp_host",
+    "email_smtp_port",
+    "email_from_address",
+    "email_smtp_username",
+    "email_smtp_password",
+    "sms_enabled",
+    "sms_provider",
+    "reminder_days_before_due",
+    "overdue_notification_frequency",
+    "notify_on_payment",
+    "notify_on_penalty",
+    "twilio_account_sid",
+    "twilio_auth_token",
+    "twilio_phone_number",
+    "twilio_messaging_service_sid",
+  ],
 };
 
-export const useFarmManagementSettings =
-  (): UseFarmManagementSettingsReturn => {
-    const [settings, setSettings] = useState<FarmManagementSettings | null>(
-      null,
-    );
-    const [originalSettings, setOriginalSettings] =
-      useState<FarmManagementSettings | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
-    const [saveError, setSaveError] = useState<string | null>(null);
+function sanitizeSettings<T extends Record<string, any>>(
+  obj: T,
+  allowedKeys: string[],
+): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key of allowedKeys) {
+    if (key in obj) {
+      result[key as keyof T] = obj[key];
+    }
+  }
+  return result;
+}
 
-    // 👇 Get context refresh function
-    const { refreshSettings } = useSettings();
+export const useFarmManagementSettings = () => {
+  const { refreshSettings } = useSettings();
+  const [settings, setSettings] = useState(DEFAULTS);
+  const [originalSettings, setOriginalSettings] = useState(DEFAULTS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    const fetchSettings = useCallback(async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  useEffect(() => {
+    fetchSettings();
+  }, []);
 
-        const response = await systemConfigAPI.getGroupedConfig();
-
-        if (response.status && response.data?.grouped_settings) {
-          const grouped = response.data.grouped_settings;
-
-          const farmSettings = {
-            farm_session: grouped.farm_session || {},
-            farm_bukid: grouped.farm_bukid || {},
-            farm_pitak: grouped.farm_pitak || {},
-            farm_assignment: grouped.farm_assignment || {},
-            farm_payment: grouped.farm_payment || {},
-            farm_debt: grouped.farm_debt || {},
-            farm_audit: grouped.farm_audit || {},
-          };
-
-          // Normalize boolean fields
-          const normalizedSettings = normalizeBooleanFields(farmSettings);
-
-          setSettings(normalizedSettings);
-          setOriginalSettings(JSON.parse(JSON.stringify(normalizedSettings)));
-        } else {
-          throw new Error(response.message || "Failed to fetch farm settings");
-        }
-      } catch (err: any) {
-        console.error("Error fetching farm settings:", err);
-        setError(err.message || "An error occurred while fetching settings");
-
-        const defaultSettings = {
-          farm_session: {},
-          farm_bukid: {},
-          farm_pitak: {},
-          farm_assignment: {},
-          farm_payment: {},
-          farm_debt: {},
-          farm_audit: {},
-        };
-
-        const normalizedDefaults = normalizeBooleanFields(defaultSettings);
-        setSettings(normalizedDefaults);
-        setOriginalSettings(JSON.parse(JSON.stringify(normalizedDefaults)));
-      } finally {
-        setLoading(false);
-      }
-    }, []);
-
-    const updateFormSettings = useCallback(
-      (category: keyof FarmManagementSettings, newSettings: any) => {
-        setSettings((prev) => {
-          if (!prev) return prev;
-
-          // Normalize new settings before updating
-          const normalizedNewSettings = normalizeBooleanFields(newSettings);
-
-          return {
-            ...prev,
-            [category]: { ...prev[category], ...normalizedNewSettings },
-          };
+  const fetchSettings = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await systemConfigAPI.getGroupedConfig();
+      if (response.status && response.data?.grouped_settings) {
+        const grouped = response.data.grouped_settings;
+        setSettings({
+          farm_session: { ...DEFAULTS.farm_session, ...grouped.farm_session },
+          farm_bukid: { ...DEFAULTS.farm_bukid, ...grouped.farm_bukid },
+          farm_pitak: { ...DEFAULTS.farm_pitak, ...grouped.farm_pitak },
+          farm_assignment: { ...DEFAULTS.farm_assignment, ...grouped.farm_assignment },
+          farm_payment: { ...DEFAULTS.farm_payment, ...grouped.farm_payment },
+          farm_debt: { ...DEFAULTS.farm_debt, ...grouped.farm_debt },
+          farm_audit: { ...DEFAULTS.farm_audit, ...grouped.farm_audit },
+          notification: { ...DEFAULTS.notification, ...grouped.notification },
         });
-      },
-      [],
-    );
-
-    const updateSettings = async (
-      newSettings: Partial<FarmManagementSettings>,
-    ) => {
-      try {
-        setSaving(true);
-        setSaveSuccess(false);
-        setSaveError(null);
-
-        console.log("Updating farm settings:", newSettings);
-
-        const response = await systemConfigAPI.updateGroupedConfig(newSettings);
-
-        if (response.status) {
-          const updatedSettings = { ...settings!, ...newSettings };
-
-          // Normalize the updated settings
-          const normalizedSettings = normalizeBooleanFields(updatedSettings);
-
-          setSettings(normalizedSettings);
-          setOriginalSettings(JSON.parse(JSON.stringify(normalizedSettings)));
-          setSaveSuccess(true);
-
-          // 👇 Force the SettingsContext to reload, so hooks like useDefaultSessionId update immediately
-          try {
-            await refreshSettings();
-          } catch (refreshErr) {
-            console.warn("Failed to refresh settings context", refreshErr);
-          }
-
-          showSuccess("Farm settings saved successfully!");
-
-          // Optional: still fetch again after a short delay to be extra safe
-          setTimeout(() => fetchSettings(), 500);
-        } else {
-          throw new Error(response.message || "Failed to update settings");
-        }
-      } catch (err: any) {
-        console.error("Error updating farm settings:", err);
-        setSaveError(err.message || "An error occurred while saving settings");
-        showError("Failed to save farm settings");
-      } finally {
-        setSaving(false);
+        setOriginalSettings({
+          farm_session: { ...DEFAULTS.farm_session, ...grouped.farm_session },
+          farm_bukid: { ...DEFAULTS.farm_bukid, ...grouped.farm_bukid },
+          farm_pitak: { ...DEFAULTS.farm_pitak, ...grouped.farm_pitak },
+          farm_assignment: { ...DEFAULTS.farm_assignment, ...grouped.farm_assignment },
+          farm_payment: { ...DEFAULTS.farm_payment, ...grouped.farm_payment },
+          farm_debt: { ...DEFAULTS.farm_debt, ...grouped.farm_debt },
+          farm_audit: { ...DEFAULTS.farm_audit, ...grouped.farm_audit },
+          notification: { ...DEFAULTS.notification, ...grouped.notification },
+        });
       }
-    };
-
-    const resetForm = useCallback(() => {
-      if (originalSettings) {
-        // Use normalized settings when resetting
-        const normalizedReset = normalizeBooleanFields(originalSettings);
-        setSettings(JSON.parse(JSON.stringify(normalizedReset)));
-      }
-      setSaveSuccess(false);
-      setSaveError(null);
-      showSuccess("Settings reset to original values");
-    }, [originalSettings]);
-
-    const hasChanges = useMemo(() => {
-      if (!settings || !originalSettings) {
-        return false;
-      }
-
-      // Normalize both settings before comparison
-      const normalizedSettings = normalizeBooleanFields(settings);
-      const normalizedOriginal = normalizeBooleanFields(originalSettings);
-
-      return !deepEqual(normalizedSettings, normalizedOriginal);
-    }, [settings, originalSettings]);
-
-    useEffect(() => {
-      fetchSettings();
-    }, [fetchSettings]);
-
-    return {
-      settings,
-      loading,
-      error,
-      saving,
-      saveSuccess,
-      saveError,
-      fetchSettings,
-      updateSettings,
-      updateFormSettings,
-      resetForm,
-      hasChanges,
-    };
+    } catch (err: any) {
+      setError(err.message || "Failed to load farm settings");
+      dialogs.error(err.message || "Failed to load farm settings");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Generic field updater
+  const updateCategoryField = useCallback(
+    <C extends keyof typeof DEFAULTS>(category: C, field: keyof (typeof DEFAULTS)[C], value: any) => {
+      setSettings((prev) => ({
+        ...prev,
+        [category]: {
+          ...prev[category],
+          [field]: value,
+        },
+      }));
+    },
+    [],
+  );
+
+  // Category-specific updaters
+  const updateFarmSession = (field: keyof FarmSessionSettings, value: any) =>
+    updateCategoryField("farm_session", field, value);
+  const updateFarmBukid = (field: keyof FarmBukidSettings, value: any) =>
+    updateCategoryField("farm_bukid", field, value);
+  const updateFarmPitak = (field: keyof FarmPitakSettings, value: any) =>
+    updateCategoryField("farm_pitak", field, value);
+  const updateFarmAssignment = (field: keyof FarmAssignmentSettings, value: any) =>
+    updateCategoryField("farm_assignment", field, value);
+  const updateFarmPayment = (field: keyof FarmPaymentSettings, value: any) =>
+    updateCategoryField("farm_payment", field, value);
+  const updateFarmDebt = (field: keyof FarmDebtSettings, value: any) =>
+    updateCategoryField("farm_debt", field, value);
+  const updateFarmAudit = (field: keyof FarmAuditSettings, value: any) =>
+    updateCategoryField("farm_audit", field, value);
+  const updateFarmNotifications = (field: keyof FarmNotificationsSettings, value: any) =>
+    updateCategoryField("notification", field, value);
+
+  // Save all settings
+  const saveSettings = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    const combinedConfig: Record<string, any> = {};
+    const categories = Object.keys(DEFAULTS) as Array<keyof typeof DEFAULTS>;
+
+    for (const category of categories) {
+      const categoryData = settings[category];
+      if (!categoryData || typeof categoryData !== "object") continue;
+
+      const dataToSend = sanitizeSettings(categoryData, ALLOWED_KEYS[category]);
+      // Filter out any numeric keys (safety)
+      const filtered: Record<string, any> = {};
+      for (const [key, value] of Object.entries(dataToSend)) {
+        // Only allow string keys that are not pure numbers
+        if (typeof key === "string" && !/^\d+$/.test(key)) {
+          filtered[key] = value;
+        } else {
+          console.warn(`Skipping invalid key "${key}" in category "${category}"`);
+        }
+      }
+
+      if (Object.keys(filtered).length > 0) {
+        combinedConfig[category] = filtered;
+      }
+    }
+
+    // Debug: log what we are sending
+    console.log("Saving farm settings payload:", combinedConfig);
+
+    try {
+      const response = await systemConfigAPI.updateGroupedConfig(combinedConfig);
+      if (response.status) {
+        setSuccessMessage("Farm settings saved successfully");
+        // await dialogs.success("Farm settings saved successfully");
+        await fetchSettings();
+        await refreshSettings();
+      } else {
+        throw new Error(response.message || "Failed to save farm settings");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to save farm settings");
+      dialogs.error(err.message || "Failed to save farm settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetToDefaults = async () => {
+    const confirmed = await dialogs.confirm({
+      title: "Reset Farm Settings",
+      message: "Are you sure you want to reset all farm settings to default values? This cannot be undone.",
+      confirmText: "Reset",
+      icon: "danger",
+    });
+    if (!confirmed) return;
+    setLoading(true);
+    try {
+      await systemConfigAPI.resetToDefaults();
+      setSuccessMessage("Farm settings reset to defaults");
+      // dialogs.success("Farm settings reset to defaults");
+      await fetchSettings();
+      await refreshSettings();
+    } catch (err: any) {
+      setError(err.message || "Failed to reset farm settings");
+      dialogs.error(err.message || "Failed to reset farm settings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(settings) !== JSON.stringify(originalSettings);
+  }, [settings, originalSettings]);
+
+  return {
+    settings,
+    loading,
+    saving,
+    error,
+    successMessage,
+    setError,
+    setSuccessMessage,
+    updateFarmSession,
+    updateFarmBukid,
+    updateFarmPitak,
+    updateFarmAssignment,
+    updateFarmPayment,
+    updateFarmDebt,
+    updateFarmAudit,
+    updateFarmNotifications,
+    saveSettings,
+    resetToDefaults,
+    refetch: fetchSettings,
+    hasChanges,
+  };
+};

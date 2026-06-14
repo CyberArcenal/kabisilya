@@ -372,5 +372,6 @@ export const useAssignments = () => {
     handleFormSuccess,
     handleBulkSuccess,
     resetFilters,
+    refetch: fetchAssignments,
   };
 };

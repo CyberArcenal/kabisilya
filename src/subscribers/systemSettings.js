@@ -16,9 +16,9 @@ class SystemSettingSubscriber {
   async beforeInsert(entity) {
     try {
       // @ts-ignore
-      logger.info("[SystemSettingSubscriber] beforeInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      // logger.info("[SystemSettingSubscriber] beforeInsert", {
+      //   entity: JSON.parse(JSON.stringify(entity)),
+      // });
     } catch (err) {
       // @ts-ignore
       logger.error("[SystemSettingSubscriber] beforeInsert error", err);

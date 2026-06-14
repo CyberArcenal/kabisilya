@@ -39,7 +39,7 @@ class BukidStateTransitionService {
         pitak.status = "completed";
         pitak.updatedAt = new Date();
         try {
-          await updateDb(pitakRepo, pitak, { queryRunner: qr, skipSignal: true });
+          await updateDb(pitakRepo, pitak, { queryRunner: qr, skipSignal: false });
           await auditLogger.logUpdate("Pitak", pitak.id, { status: oldPitakStatus }, { status: "completed" }, user);
           logger.info(`[BukidTransition] Pitak #${pitak.id} set to complete due to bukid completion.`);
         } catch (error) {
