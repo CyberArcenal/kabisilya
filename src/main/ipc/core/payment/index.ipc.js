@@ -20,6 +20,7 @@ class PaymentHandler {
     this.getPaymentStats = this.importHandler("./get/stats.ipc");
 
     // WRITE
+    this.recordPayment = this.importHandler("./record_payment.ipc");
     this.createPayment = this.importHandler("./create.ipc");
     this.updatePayment = this.importHandler("./update.ipc");
     this.deletePayment = this.importHandler("./delete.ipc");
@@ -73,6 +74,8 @@ class PaymentHandler {
           return await this.handleWithTransaction(this.updateStatus, params);
         case "deletePayment":
           return await this.handleWithTransaction(this.deletePayment, params);
+          case "recordPayment":
+  return await this.handleWithTransaction(this.recordPayment, params);
         default:
           return {
             status: false,

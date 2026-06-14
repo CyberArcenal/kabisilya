@@ -1,6 +1,6 @@
 // services/PaymentService.js
 // Refactored to follow the same structure as DebtService, AssignmentService, etc.
-
+//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 
@@ -52,9 +52,12 @@ class PaymentService {
    * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
-    const qrType = qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
     const hasManager = qr && typeof qr === "object" && !!qr.manager;
-    console.log(`[Payment._getRepo] qr type: ${qrType}, has manager: ${hasManager}`);
+    console.log(
+      `[Payment._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
 
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
@@ -90,19 +93,29 @@ class PaymentService {
       if (!data.sessionId) throw new Error("sessionId is required");
       if (data.amount === undefined) throw new Error("amount is required");
 
-      const worker = await workerRepo.findOne({ where: { id: data.workerId, deletedAt: null } });
+      const worker = await workerRepo.findOne({
+        where: { id: data.workerId, deletedAt: null },
+      });
       if (!worker) throw new Error(`Worker with ID ${data.workerId} not found`);
 
-      const pitak = await pitakRepo.findOne({ where: { id: data.pitakId, deletedAt: null } });
+      const pitak = await pitakRepo.findOne({
+        where: { id: data.pitakId, deletedAt: null },
+      });
       if (!pitak) throw new Error(`Pitak with ID ${data.pitakId} not found`);
 
-      const session = await sessionRepo.findOne({ where: { id: data.sessionId, deletedAt: null } });
-      if (!session) throw new Error(`Session with ID ${data.sessionId} not found`);
+      const session = await sessionRepo.findOne({
+        where: { id: data.sessionId, deletedAt: null },
+      });
+      if (!session)
+        throw new Error(`Session with ID ${data.sessionId} not found`);
 
       let assignment = null;
       if (data.assignmentId) {
-        assignment = await assignmentRepo.findOne({ where: { id: data.assignmentId, deletedAt: null } });
-        if (!assignment) throw new Error(`Assignment with ID ${data.assignmentId} not found`);
+        assignment = await assignmentRepo.findOne({
+          where: { id: data.assignmentId, deletedAt: null },
+        });
+        if (!assignment)
+          throw new Error(`Assignment with ID ${data.assignmentId} not found`);
       }
 
       // Check uniqueness of (worker, pitak, session) – only one active payment per combination
@@ -115,7 +128,9 @@ class PaymentService {
         },
       });
       if (existing) {
-        throw new Error("A payment already exists for this worker, pitak, and session combination");
+        throw new Error(
+          "A payment already exists for this worker, pitak, and session combination",
+        );
       }
 
       // If assignmentId provided, ensure it's not linked to another active payment
@@ -124,7 +139,9 @@ class PaymentService {
           where: { assignment: { id: data.assignmentId }, deletedAt: null },
         });
         if (existingByAssignment) {
-          throw new Error(`Assignment ID ${data.assignmentId} is already linked to another payment`);
+          throw new Error(
+            `Assignment ID ${data.assignmentId} is already linked to another payment`,
+          );
         }
       }
 
@@ -134,7 +151,9 @@ class PaymentService {
           where: { idempotencyKey: data.idempotencyKey, deletedAt: null },
         });
         if (existingKey) {
-          throw new Error(`Idempotency key "${data.idempotencyKey}" already exists`);
+          throw new Error(
+            `Idempotency key "${data.idempotencyKey}" already exists`,
+          );
         }
       }
 
@@ -194,20 +213,28 @@ class PaymentService {
 
       // Handle relation changes
       if (data.workerId !== undefined) {
-        const worker = await workerRepo.findOne({ where: { id: data.workerId, deletedAt: null } });
-        if (!worker) throw new Error(`Worker with ID ${data.workerId} not found`);
+        const worker = await workerRepo.findOne({
+          where: { id: data.workerId, deletedAt: null },
+        });
+        if (!worker)
+          throw new Error(`Worker with ID ${data.workerId} not found`);
         existing.worker = worker;
         delete data.workerId;
       }
       if (data.pitakId !== undefined) {
-        const pitak = await pitakRepo.findOne({ where: { id: data.pitakId, deletedAt: null } });
+        const pitak = await pitakRepo.findOne({
+          where: { id: data.pitakId, deletedAt: null },
+        });
         if (!pitak) throw new Error(`Pitak with ID ${data.pitakId} not found`);
         existing.pitak = pitak;
         delete data.pitakId;
       }
       if (data.sessionId !== undefined) {
-        const session = await sessionRepo.findOne({ where: { id: data.sessionId, deletedAt: null } });
-        if (!session) throw new Error(`Session with ID ${data.sessionId} not found`);
+        const session = await sessionRepo.findOne({
+          where: { id: data.sessionId, deletedAt: null },
+        });
+        if (!session)
+          throw new Error(`Session with ID ${data.sessionId} not found`);
         existing.session = session;
         delete data.sessionId;
       }
@@ -215,8 +242,13 @@ class PaymentService {
         if (data.assignmentId === null) {
           existing.assignment = null;
         } else {
-          const assignment = await assignmentRepo.findOne({ where: { id: data.assignmentId, deletedAt: null } });
-          if (!assignment) throw new Error(`Assignment with ID ${data.assignmentId} not found`);
+          const assignment = await assignmentRepo.findOne({
+            where: { id: data.assignmentId, deletedAt: null },
+          });
+          if (!assignment)
+            throw new Error(
+              `Assignment with ID ${data.assignmentId} not found`,
+            );
           existing.assignment = assignment;
         }
         delete data.assignmentId;
@@ -226,8 +258,14 @@ class PaymentService {
       }
 
       // Re-check uniqueness if critical fields changed
-      if ((data.workerId !== undefined || data.pitakId !== undefined || data.sessionId !== undefined) &&
-          existing.worker && existing.pitak && existing.session) {
+      if (
+        (data.workerId !== undefined ||
+          data.pitakId !== undefined ||
+          data.sessionId !== undefined) &&
+        existing.worker &&
+        existing.pitak &&
+        existing.session
+      ) {
         const duplicate = await paymentRepo.findOne({
           where: {
             worker: { id: existing.worker.id },
@@ -237,27 +275,39 @@ class PaymentService {
           },
         });
         if (duplicate && duplicate.id !== id) {
-          throw new Error("Another payment already exists for this worker, pitak, and session combination");
+          throw new Error(
+            "Another payment already exists for this worker, pitak, and session combination",
+          );
         }
       }
 
       // If assignment changed, check its uniqueness
       if (data.assignmentId !== undefined && existing.assignment) {
         const duplicateAssignment = await paymentRepo.findOne({
-          where: { assignment: { id: existing.assignment.id }, deletedAt: null },
+          where: {
+            assignment: { id: existing.assignment.id },
+            deletedAt: null,
+          },
         });
         if (duplicateAssignment && duplicateAssignment.id !== id) {
-          throw new Error(`Assignment ID ${existing.assignment.id} is already linked to another payment`);
+          throw new Error(
+            `Assignment ID ${existing.assignment.id} is already linked to another payment`,
+          );
         }
       }
 
       // Idempotency key uniqueness if changed
-      if (data.idempotencyKey && data.idempotencyKey !== existing.idempotencyKey) {
+      if (
+        data.idempotencyKey &&
+        data.idempotencyKey !== existing.idempotencyKey
+      ) {
         const keyExists = await paymentRepo.findOne({
           where: { idempotencyKey: data.idempotencyKey, deletedAt: null },
         });
         if (keyExists) {
-          throw new Error(`Idempotency key "${data.idempotencyKey}" already exists`);
+          throw new Error(
+            `Idempotency key "${data.idempotencyKey}" already exists`,
+          );
         }
       }
 
@@ -285,7 +335,9 @@ class PaymentService {
     const Payment = require("../entities/Payment");
     const paymentRepo = this._getRepo(qr, Payment);
 
-    const payment = await paymentRepo.findOne({ where: { id, deletedAt: null } });
+    const payment = await paymentRepo.findOne({
+      where: { id, deletedAt: null },
+    });
     if (!payment) throw new Error(`Payment with ID ${id} not found`);
 
     const oldStatus = payment.status;
@@ -299,14 +351,22 @@ class PaymentService {
     };
 
     if (!allowedTransitions[oldStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${oldStatus} to ${newStatus}`);
+      throw new Error(
+        `Invalid status transition from ${oldStatus} to ${newStatus}`,
+      );
     }
 
     payment.status = newStatus;
     payment.updatedAt = new Date();
 
     const saved = await updateDb(paymentRepo, payment, { queryRunner: qr });
-    await auditLogger.logUpdate("Payment", id, { status: oldStatus }, { status: newStatus }, user);
+    await auditLogger.logUpdate(
+      "Payment",
+      id,
+      { status: oldStatus },
+      { status: newStatus },
+      user,
+    );
     return saved;
   }
 
@@ -322,9 +382,12 @@ class PaymentService {
     const paymentRepo = this._getRepo(qr, Payment);
 
     try {
-      const payment = await paymentRepo.findOne({ where: { id, deletedAt: null } });
+      const payment = await paymentRepo.findOne({
+        where: { id, deletedAt: null },
+      });
       if (!payment) throw new Error(`Payment with ID ${id} not found`);
-      if (payment.deletedAt) throw new Error(`Payment #${id} is already deleted`);
+      if (payment.deletedAt)
+        throw new Error(`Payment #${id} is already deleted`);
 
       const oldData = { ...payment };
       payment.deletedAt = new Date();
@@ -352,7 +415,10 @@ class PaymentService {
     const paymentRepo = this._getRepo(qr, Payment);
 
     try {
-      const payment = await paymentRepo.findOne({ where: { id }, withDeleted: true });
+      const payment = await paymentRepo.findOne({
+        where: { id },
+        withDeleted: true,
+      });
       if (!payment) throw new Error(`Payment with ID ${id} not found`);
       if (!payment.deletedAt) throw new Error(`Payment #${id} is not deleted`);
 
@@ -360,7 +426,13 @@ class PaymentService {
       payment.updatedAt = new Date();
 
       const saved = await updateDb(paymentRepo, payment, { queryRunner: qr });
-      await auditLogger.logUpdate("Payment", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "Payment",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Payment restored: #${id}`);
       return saved;
     } catch (error) {
@@ -380,7 +452,10 @@ class PaymentService {
     const Payment = require("../entities/Payment");
     const paymentRepo = this._getRepo(qr, Payment);
 
-    const payment = await paymentRepo.findOne({ where: { id }, withDeleted: true });
+    const payment = await paymentRepo.findOne({
+      where: { id },
+      withDeleted: true,
+    });
     if (!payment) throw new Error(`Payment with ID ${id} not found`);
 
     await removeDb(paymentRepo, payment);
@@ -447,31 +522,43 @@ class PaymentService {
       qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
     }
     if (options.assignmentId) {
-      qb.andWhere("assignment.id = :assignmentId", { assignmentId: options.assignmentId });
+      qb.andWhere("assignment.id = :assignmentId", {
+        assignmentId: options.assignmentId,
+      });
     }
     if (options.status) {
       qb.andWhere("payment.status = :status", { status: options.status });
     }
     if (options.startDate) {
-      qb.andWhere("payment.paymentDate >= :startDate", { startDate: new Date(options.startDate) });
+      qb.andWhere("payment.paymentDate >= :startDate", {
+        startDate: new Date(options.startDate),
+      });
     }
     if (options.endDate) {
-      qb.andWhere("payment.paymentDate <= :endDate", { endDate: new Date(options.endDate) });
+      qb.andWhere("payment.paymentDate <= :endDate", {
+        endDate: new Date(options.endDate),
+      });
     }
     if (options.minAmount) {
-      qb.andWhere("payment.amount >= :minAmount", { minAmount: options.minAmount });
+      qb.andWhere("payment.amount >= :minAmount", {
+        minAmount: options.minAmount,
+      });
     }
     if (options.maxAmount) {
-      qb.andWhere("payment.amount <= :maxAmount", { maxAmount: options.maxAmount });
+      qb.andWhere("payment.amount <= :maxAmount", {
+        maxAmount: options.maxAmount,
+      });
     }
     if (options.search) {
       qb.andWhere(
         "(worker.name LIKE :search OR pitak.name LIKE :search OR payment.description LIKE :search)",
-        { search: `%${options.search}%` }
+        { search: `%${options.search}%` },
       );
     }
     if (options.idempotencyKey) {
-      qb.andWhere("payment.idempotencyKey = :key", { key: options.idempotencyKey });
+      qb.andWhere("payment.idempotencyKey = :key", {
+        key: options.idempotencyKey,
+      });
     }
 
     // Sorting
@@ -490,28 +577,83 @@ class PaymentService {
   }
 
   /**
-   * Get payment statistics
+   * Get payment statistics based on filters (same as findAll)
+   * @param {Object} options - same filter options as findAll
+   * @returns {Promise<Object>} - totals and breakdowns
    */
-  async getStatistics() {
+  async getStatistics(options = {}) {
     const { payment: repo } = await this.getRepositories();
-    const qb = repo.createQueryBuilder("payment").where("payment.deletedAt IS NULL");
 
-    const total = await qb.getCount();
-    const pending = await qb.clone().andWhere("payment.status = :status", { status: "pending" }).getCount();
-    const partiallyPaid = await qb.clone().andWhere("payment.status = :status", { status: "partially_paid" }).getCount();
-    const completed = await qb.clone().andWhere("payment.status = :status", { status: "completed" }).getCount();
-    const cancelled = await qb.clone().andWhere("payment.status = :status", { status: "cancelled" }).getCount();
+    const qb = repo
+      .createQueryBuilder("payment")
+      .leftJoin("payment.worker", "worker")
+      .leftJoin("payment.pitak", "pitak")
+      .leftJoin("payment.session", "session")
+      .where("payment.deletedAt IS NULL");
 
-    const totalAmountSum = await qb.clone().select("SUM(payment.amount)", "sum").getRawOne();
-    const totalAmount = parseFloat(totalAmountSum.sum) || 0;
+    // Apply filters exactly like findAll
+    if (options.workerId) {
+      qb.andWhere("worker.id = :workerId", { workerId: options.workerId });
+    }
+    if (options.pitakId) {
+      qb.andWhere("pitak.id = :pitakId", { pitakId: options.pitakId });
+    }
+    if (options.sessionId) {
+      qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
+    }
+    if (options.status) {
+      qb.andWhere("payment.status = :status", { status: options.status });
+    }
+    if (options.startDate) {
+      qb.andWhere("payment.paymentDate >= :startDate", {
+        startDate: new Date(options.startDate),
+      });
+    }
+    if (options.endDate) {
+      qb.andWhere("payment.paymentDate <= :endDate", {
+        endDate: new Date(options.endDate),
+      });
+    }
+    if (options.search) {
+      qb.andWhere(
+        "(worker.name LIKE :search OR pitak.location LIKE :search OR payment.referenceNumber LIKE :search)",
+        { search: `%${options.search}%` },
+      );
+    }
+    if (options.idempotencyKey) {
+      qb.andWhere("payment.idempotencyKey = :key", {
+        key: options.idempotencyKey,
+      });
+    }
+
+    // Get aggregate sums
+    const sums = await qb
+      .clone()
+      .select([
+        "SUM(payment.grossPay) as totalGross",
+        "SUM(payment.netPay) as totalNet",
+        "SUM(payment.totalDebtDeduction) as totalDebtDeduction",
+      ])
+      .getRawOne();
+
+    // Get status breakdown
+    const statusBreakdown = await qb
+      .clone()
+      .select("payment.status", "status")
+      .addSelect("COUNT(payment.id)", "count")
+      .groupBy("payment.status")
+      .getRawMany();
+
+    const breakdown = statusBreakdown.reduce((acc, row) => {
+      acc[row.status] = parseInt(row.count, 10);
+      return acc;
+    }, {});
 
     return {
-      total,
-      pending,
-      partiallyPaid,
-      completed,
-      cancelled,
-      totalAmount,
+      totalGross: parseFloat(sums.totalGross) || 0,
+      totalNet: parseFloat(sums.totalNet) || 0,
+      totalDebtDeduction: parseFloat(sums.totalDebtDeduction) || 0,
+      breakdown,
     };
   }
 
@@ -528,9 +670,20 @@ class PaymentService {
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Worker ID", "Worker Name", "Pitak ID", "Pitak Name", "Session ID",
-        "Assignment ID", "Amount", "Payment Date", "Description", "Status",
-        "Idempotency Key", "Created At", "Updated At"
+        "ID",
+        "Worker ID",
+        "Worker Name",
+        "Pitak ID",
+        "Pitak Name",
+        "Session ID",
+        "Assignment ID",
+        "Amount",
+        "Payment Date",
+        "Description",
+        "Status",
+        "Idempotency Key",
+        "Created At",
+        "Updated At",
       ];
       const rows = payments.map((p) => [
         p.id,
@@ -627,9 +780,12 @@ class PaymentService {
           workerId: parseInt(record.workerId, 10),
           pitakId: parseInt(record.pitakId, 10),
           sessionId: parseInt(record.sessionId, 10),
-          assignmentId: record.assignmentId ? parseInt(record.assignmentId, 10) : undefined,
+          assignmentId: record.assignmentId
+            ? parseInt(record.assignmentId, 10)
+            : undefined,
           amount: parseFloat(record.amount),
-          paymentDate: record.paymentDate || new Date().toISOString().split("T")[0],
+          paymentDate:
+            record.paymentDate || new Date().toISOString().split("T")[0],
           description: record.description || null,
           status: record.status || "pending",
           idempotencyKey: record.idempotencyKey || null,
@@ -637,7 +793,8 @@ class PaymentService {
         if (!paymentData.workerId) throw new Error("workerId is required");
         if (!paymentData.pitakId) throw new Error("pitakId is required");
         if (!paymentData.sessionId) throw new Error("sessionId is required");
-        if (isNaN(paymentData.amount)) throw new Error("amount must be a number");
+        if (isNaN(paymentData.amount))
+          throw new Error("amount must be a number");
         const saved = await this.create(paymentData, user, qr);
         results.imported.push(saved);
       } catch (err) {
@@ -645,6 +802,129 @@ class PaymentService {
       }
     }
     return results;
+  }
+
+  /**
+   * Record a payment transaction (partial or full)
+   * @param {number} paymentId
+   * @param {Object} recordData - { amountPaid, applyToDebt, paymentMethod, referenceNumber, notes }
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner|null} qr
+   */
+  async recordPayment(paymentId, recordData, user = "system", qr = null) {
+    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
+    const Payment = require("../entities/Payment");
+    const PaymentHistory = require("../entities/PaymentHistory");
+    const debtService = require("./DebtService");
+
+    const paymentRepo = this._getRepo(qr, Payment);
+    const historyRepo = this._getRepo(qr, PaymentHistory);
+
+    // 1. Get payment with relations
+    const payment = await paymentRepo.findOne({
+      where: { id: paymentId, deletedAt: null },
+      relations: ["worker", "pitak", "session"],
+    });
+    if (!payment) throw new Error(`Payment #${paymentId} not found`);
+
+    // 2. Validate
+    if (payment.status === "cancelled") {
+      throw new Error("Cannot record payment for a cancelled payment");
+    }
+    if (payment.status === "completed") {
+      throw new Error("Payment is already completed");
+    }
+
+    const { amountPaid, applyToDebt, paymentMethod, referenceNumber, notes } =
+      recordData;
+
+    if (!amountPaid || amountPaid <= 0)
+      throw new Error("Amount paid must be greater than zero");
+
+    const newAmountPaid = (payment.amountPaid || 0) + amountPaid;
+    if (newAmountPaid > payment.grossPay) {
+      throw new Error(
+        `Total amount paid (${newAmountPaid}) exceeds gross pay (${payment.grossPay})`,
+      );
+    }
+
+    if (applyToDebt < 0 || applyToDebt > amountPaid) {
+      throw new Error("Apply to debt amount must be between 0 and amount paid");
+    }
+
+    // 3. Calculate new totals
+    const oldAmountPaid = payment.amountPaid || 0;
+    const oldDebtDeduction = payment.debtDeductionTotal || 0;
+    const newDebtDeduction = oldDebtDeduction + applyToDebt;
+
+    // Recalculate netPay = grossPay - manualDeduction - totalDebtDeduction
+    const manualDeduction = payment.manualDeduction || 0;
+    const newNetPay = payment.grossPay - manualDeduction - newDebtDeduction;
+    if (newNetPay < 0)
+      throw new Error("Net pay cannot be negative after debt deduction");
+
+    // 4. Update payment
+    payment.amountPaid = newAmountPaid;
+    payment.lastPaymentDate = new Date();
+    payment.debtDeductionTotal = newDebtDeduction;
+    payment.netPay = newNetPay;
+    payment.paymentMethod = paymentMethod || payment.paymentMethod;
+    payment.referenceNumber = referenceNumber || payment.referenceNumber;
+    payment.notes = notes
+      ? payment.notes
+        ? payment.notes + "\n" + notes
+        : notes
+      : payment.notes;
+    payment.status =
+      newAmountPaid >= payment.grossPay ? "completed" : "partially_paid";
+    payment.updatedAt = new Date();
+
+    await updateDb(paymentRepo, payment, { queryRunner: qr });
+
+    // 5. Deduct from debts if applyToDebt > 0
+    let actualDeducted = 0;
+    if (applyToDebt > 0) {
+      actualDeducted = await debtService.deductFromWorker(
+        payment.worker.id,
+        applyToDebt,
+        payment.id,
+        payment.session.id,
+        user,
+        qr,
+      );
+      if (actualDeducted < applyToDebt) {
+        console.warn(
+          `Only ${actualDeducted} of ${applyToDebt} could be deducted from debts`,
+        );
+      }
+    }
+
+    // 6. Create PaymentHistory entry
+    const history = historyRepo.create({
+      payment,
+      actionType: "payment_recorded",
+      changedField: "amountPaid",
+      oldValue: oldAmountPaid.toString(),
+      newValue: newAmountPaid.toString(),
+      oldAmount: oldAmountPaid,
+      newAmount: newAmountPaid,
+      notes: `Recorded payment of ${amountPaid}, applied ${actualDeducted} to debt`,
+      performedBy: user,
+      referenceNumber: referenceNumber,
+    });
+    await saveDb(historyRepo, history, { queryRunner: qr });
+    await auditLogger.logCreate("PaymentHistory", history.id, history, user);
+
+    // 7. Audit log
+    await auditLogger.logUpdate(
+      "Payment",
+      payment.id,
+      { amountPaid: oldAmountPaid },
+      { amountPaid: newAmountPaid },
+      user,
+    );
+
+    return payment;
   }
 }
 

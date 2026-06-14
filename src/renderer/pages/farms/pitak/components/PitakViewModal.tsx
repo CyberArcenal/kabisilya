@@ -33,8 +33,8 @@ const PitakViewModal: React.FC<Props> = ({ isOpen, onClose, pitak, onWorkerClick
             <p>{pitak.bukid?.name || "—"}</p>
           </div>
           <div>
-            <label className="text-xs font-medium text-[var(--text-tertiary)]">Area (sqm)</label>
-            <p>{pitak.area ?? "—"}</p>
+            <label className="text-xs font-medium text-[var(--text-tertiary)]">Luwang</label>
+            <p>{pitak.totalLuwang ?? "—"}</p>
           </div>
           <div className="col-span-2">
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Description</label>
@@ -47,7 +47,7 @@ const PitakViewModal: React.FC<Props> = ({ isOpen, onClose, pitak, onWorkerClick
           {(!pitak.workers || pitak.workers.length === 0) ? (
             <p className="text-sm text-[var(--text-tertiary)]">No workers assigned</p>
           ) : (
-            <WorkerAvatarStack workers={pitak.workers} onWorkerClick={onWorkerClick} />
+            <WorkerAvatarStack workers={pitak.workers} onWorkerClick={onWorkerClick} pitakId={pitak.id} />
           )}
         </div>
 

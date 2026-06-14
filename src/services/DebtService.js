@@ -1,6 +1,8 @@
+//@ts-check
 // services/DebtService.js
 // Refactored to follow the same structure as AssignmentService, BukidService, etc.
 
+const { In } = require("typeorm");
 const auditLogger = require("../utils/auditLogger");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 
@@ -44,9 +46,12 @@ class DebtService {
    * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
-    const qrType = qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
     const hasManager = qr && typeof qr === "object" && !!qr.manager;
-    console.log(`[Debt._getRepo] qr type: ${qrType}, has manager: ${hasManager}`);
+    console.log(
+      `[Debt._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
 
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
@@ -80,8 +85,11 @@ class DebtService {
       const worker = await workerRepo.findOne({ where: { id: data.workerId } });
       if (!worker) throw new Error(`Worker with ID ${data.workerId} not found`);
 
-      const session = await sessionRepo.findOne({ where: { id: data.sessionId } });
-      if (!session) throw new Error(`Session with ID ${data.sessionId} not found`);
+      const session = await sessionRepo.findOne({
+        where: { id: data.sessionId },
+      });
+      if (!session)
+        throw new Error(`Session with ID ${data.sessionId} not found`);
 
       const debtData = {
         worker,
@@ -133,14 +141,20 @@ class DebtService {
       const oldData = { ...existing };
 
       if (data.workerId !== undefined) {
-        const worker = await workerRepo.findOne({ where: { id: data.workerId } });
-        if (!worker) throw new Error(`Worker with ID ${data.workerId} not found`);
+        const worker = await workerRepo.findOne({
+          where: { id: data.workerId },
+        });
+        if (!worker)
+          throw new Error(`Worker with ID ${data.workerId} not found`);
         existing.worker = worker;
         delete data.workerId;
       }
       if (data.sessionId !== undefined) {
-        const session = await sessionRepo.findOne({ where: { id: data.sessionId } });
-        if (!session) throw new Error(`Session with ID ${data.sessionId} not found`);
+        const session = await sessionRepo.findOne({
+          where: { id: data.sessionId },
+        });
+        if (!session)
+          throw new Error(`Session with ID ${data.sessionId} not found`);
         existing.session = session;
         delete data.sessionId;
       }
@@ -188,14 +202,28 @@ class DebtService {
     };
 
     if (!allowedTransitions[oldStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${oldStatus} to ${newStatus}`);
+      throw new Error(
+        `Invalid status transition from ${oldStatus} to ${newStatus}`,
+      );
+    }
+
+    if (newStatus === "paid" && debt.balance !== 0) {
+      throw new Error(
+        "Cannot mark as paid because balance is not zero. Please record payment first.",
+      );
     }
 
     debt.status = newStatus;
     debt.updatedAt = new Date();
 
     const saved = await updateDb(debtRepo, debt, { queryRunner: qr });
-    await auditLogger.logUpdate("Debt", id, { status: oldStatus }, { status: newStatus }, user);
+    await auditLogger.logUpdate(
+      "Debt",
+      id,
+      { status: oldStatus },
+      { status: newStatus },
+      user,
+    );
     return saved;
   }
 
@@ -249,7 +277,13 @@ class DebtService {
       debt.updatedAt = new Date();
 
       const saved = await updateDb(debtRepo, debt, { queryRunner: qr });
-      await auditLogger.logUpdate("Debt", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "Debt",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Debt restored: #${id}`);
       return saved;
     } catch (error) {
@@ -331,27 +365,51 @@ class DebtService {
       qb.andWhere("debt.status = :status", { status: options.status });
     }
     if (options.dueDateStart) {
-      qb.andWhere("debt.dueDate >= :dueDateStart", { dueDateStart: new Date(options.dueDateStart) });
+      qb.andWhere("debt.dueDate >= :dueDateStart", {
+        dueDateStart: new Date(options.dueDateStart),
+      });
     }
     if (options.dueDateEnd) {
-      qb.andWhere("debt.dueDate <= :dueDateEnd", { dueDateEnd: new Date(options.dueDateEnd) });
+      qb.andWhere("debt.dueDate <= :dueDateEnd", {
+        dueDateEnd: new Date(options.dueDateEnd),
+      });
     }
     if (options.minAmount) {
-      qb.andWhere("debt.amount >= :minAmount", { minAmount: options.minAmount });
+      qb.andWhere("debt.amount >= :minAmount", {
+        minAmount: options.minAmount,
+      });
     }
     if (options.maxAmount) {
-      qb.andWhere("debt.amount <= :maxAmount", { maxAmount: options.maxAmount });
+      qb.andWhere("debt.amount <= :maxAmount", {
+        maxAmount: options.maxAmount,
+      });
     }
     if (options.search) {
-      qb.andWhere("(debt.description LIKE :search OR worker.name LIKE :search)", {
-        search: `%${options.search}%`,
-      });
+      qb.andWhere(
+        "(debt.description LIKE :search OR worker.name LIKE :search)",
+        {
+          search: `%${options.search}%`,
+        },
+      );
     }
 
     // Sorting
-    const sortBy = options.sortBy || "createdAt";
-    const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
-    qb.orderBy(`debt.${sortBy}`, sortOrder);
+    const sortMap = {
+      amount: "debt.amount",
+      balance: "debt.balance",
+      dueDate: "debt.dueDate",
+      status: "debt.status",
+      interestRate: "debt.interestRate",
+      createdAt: "debt.createdAt",
+      lastPaymentDate: "debt.lastPaymentDate",
+      workerName: "worker.name",
+    };
+    let sortBy =
+      options.sortBy && sortMap[options.sortBy]
+        ? sortMap[options.sortBy]
+        : "debt.dueDate";
+    let sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
+    qb.orderBy(sortBy, sortOrder);
 
     // Pagination using utility
     const result = await paginateQueryBuilder(qb, {
@@ -371,15 +429,36 @@ class DebtService {
     const qb = repo.createQueryBuilder("debt").where("debt.deletedAt IS NULL");
 
     const total = await qb.getCount();
-    const pending = await qb.clone().andWhere("debt.status = :status", { status: "pending" }).getCount();
-    const partiallyPaid = await qb.clone().andWhere("debt.status = :status", { status: "partially_paid" }).getCount();
-    const paid = await qb.clone().andWhere("debt.status = :status", { status: "paid" }).getCount();
-    const overdue = await qb.clone().andWhere("debt.status = :status", { status: "overdue" }).getCount();
-    const cancelled = await qb.clone().andWhere("debt.status = :status", { status: "cancelled" }).getCount();
+    const pending = await qb
+      .clone()
+      .andWhere("debt.status = :status", { status: "pending" })
+      .getCount();
+    const partiallyPaid = await qb
+      .clone()
+      .andWhere("debt.status = :status", { status: "partially_paid" })
+      .getCount();
+    const paid = await qb
+      .clone()
+      .andWhere("debt.status = :status", { status: "paid" })
+      .getCount();
+    const overdue = await qb
+      .clone()
+      .andWhere("debt.status = :status", { status: "overdue" })
+      .getCount();
+    const cancelled = await qb
+      .clone()
+      .andWhere("debt.status = :status", { status: "cancelled" })
+      .getCount();
 
-    const totalAmountSum = await qb.clone().select("SUM(debt.amount)", "sum").getRawOne();
+    const totalAmountSum = await qb
+      .clone()
+      .select("SUM(debt.amount)", "sum")
+      .getRawOne();
     const totalAmount = parseFloat(totalAmountSum.sum) || 0;
-    const totalBalanceSum = await qb.clone().select("SUM(debt.balance)", "sum").getRawOne();
+    const totalBalanceSum = await qb
+      .clone()
+      .select("SUM(debt.balance)", "sum")
+      .getRawOne();
     const totalBalance = parseFloat(totalBalanceSum.sum) || 0;
 
     return {
@@ -407,8 +486,18 @@ class DebtService {
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Worker ID", "Worker Name", "Session ID", "Amount", "Original Amount",
-        "Balance", "Due Date", "Description", "Status", "Created At", "Updated At"
+        "ID",
+        "Worker ID",
+        "Worker Name",
+        "Session ID",
+        "Amount",
+        "Original Amount",
+        "Balance",
+        "Due Date",
+        "Description",
+        "Status",
+        "Created At",
+        "Updated At",
       ];
       const rows = debts.map((d) => [
         d.id,
@@ -503,7 +592,9 @@ class DebtService {
           workerId: parseInt(record.workerId, 10),
           sessionId: parseInt(record.sessionId, 10),
           amount: parseFloat(record.amount),
-          originalAmount: record.originalAmount ? parseFloat(record.originalAmount) : undefined,
+          originalAmount: record.originalAmount
+            ? parseFloat(record.originalAmount)
+            : undefined,
           balance: record.balance ? parseFloat(record.balance) : undefined,
           dueDate: record.dueDate || null,
           description: record.description || null,
@@ -519,6 +610,217 @@ class DebtService {
       }
     }
     return results;
+  }
+
+  /**
+   * Deduct an amount from worker's active debts (FIFO by dueDate)
+   * @param {number} workerId
+   * @param {number} amount
+   * @param {number} paymentId
+   * @param {number} sessionId
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @returns {Promise<number>} total deducted amount
+   */
+  async deductFromWorker(
+    workerId,
+    amount,
+    paymentId,
+    sessionId,
+    user = "system",
+    qr = null,
+  ) {
+    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
+    const Debt = require("../entities/Debt");
+    const DebtHistory = require("../entities/DebtHistory");
+    const Payment = require("../entities/Payment");
+
+    const debtRepo = this._getRepo(qr, Debt);
+    const historyRepo = this._getRepo(qr, DebtHistory);
+    const paymentRepo = this._getRepo(qr, Payment);
+
+    // Fetch active debts (pending or partially_paid), order by dueDate ASC (oldest first)
+    const activeDebts = await debtRepo.find({
+      where: {
+        worker: { id: workerId },
+        session: { id: sessionId },
+        status: In(["pending", "partially_paid"]),
+        deletedAt: null,
+      },
+      order: { dueDate: "ASC" },
+    });
+
+    let remaining = amount;
+    let totalDeducted = 0;
+
+    for (const debt of activeDebts) {
+      if (remaining <= 0) break;
+      const deductAmount = Math.min(remaining, debt.balance);
+      if (deductAmount <= 0) continue;
+
+      const oldBalance = debt.balance;
+      debt.balance -= deductAmount;
+      remaining -= deductAmount;
+      totalDeducted += deductAmount;
+
+      // Update debt status
+      if (debt.balance === 0) {
+        debt.status = "paid";
+      } else if (debt.status !== "partially_paid") {
+        debt.status = "partially_paid";
+      }
+      debt.updatedAt = new Date();
+      await updateDb(debtRepo, debt, { queryRunner: qr, skipSignal: true });
+
+      // Create DebtHistory entry
+      const payment = await paymentRepo.findOne({ where: { id: paymentId } });
+      const history = historyRepo.create({
+        debt,
+        payment,
+        amountPaid: deductAmount,
+        previousBalance: oldBalance,
+        newBalance: debt.balance,
+        transactionType: "payment",
+        notes: `Payment #${paymentId} deducted from debt`,
+        performedBy: user,
+        transactionDate: new Date(),
+      });
+      await saveDb(historyRepo, history, { queryRunner: qr });
+      await auditLogger.logCreate("DebtHistory", history.id, history, user);
+    }
+
+    return totalDeducted;
+  }
+
+  /**
+   * Record a payment against a specific debt
+   * @param {number} id - debt ID
+   * @param {number} amount - amount to pay
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @param {string|null} paymentMethod
+   * @param {string|null} referenceNumber
+   * @param {string|null} notes
+   */
+  async payDebt(
+    id,
+    amount,
+    user = "system",
+    qr = null,
+    paymentMethod = null,
+    referenceNumber = null,
+    notes = null,
+  ) {
+    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
+    const Debt = require("../entities/Debt");
+    const DebtHistory = require("../entities/DebtHistory");
+    const debtRepo = this._getRepo(qr, Debt);
+    const historyRepo = this._getRepo(qr, DebtHistory);
+
+    const debt = await debtRepo.findOne({ where: { id, deletedAt: null } });
+    if (!debt) throw new Error(`Debt with ID ${id} not found`);
+    if (amount <= 0) throw new Error("Payment amount must be positive");
+    if (amount > debt.balance)
+      throw new Error(
+        `Amount cannot exceed remaining balance of ${debt.balance}`,
+      );
+
+    const oldBalance = debt.balance;
+    debt.balance -= amount;
+    debt.updatedAt = new Date();
+    if (debt.balance === 0) debt.status = "paid";
+    else if (debt.status !== "partially_paid") debt.status = "partially_paid";
+
+    await updateDb(debtRepo, debt, { queryRunner: qr });
+
+    const history = historyRepo.create({
+      debt,
+      amountPaid: amount,
+      previousBalance: oldBalance,
+      newBalance: debt.balance,
+      transactionType: "payment",
+      paymentMethod,
+      referenceNumber,
+      notes: notes || `Payment of ${amount} recorded`,
+      performedBy: user,
+      transactionDate: new Date(),
+    });
+    await saveDb(historyRepo, history, { queryRunner: qr });
+    await auditLogger.logCreate("DebtHistory", history.id, history, user);
+
+    return debt;
+  }
+
+  async getStatisticsWithFilters(options = {}) {
+    const { debt: repo } = await this.getRepositories();
+    const qb = repo
+      .createQueryBuilder("debt")
+      .leftJoin("debt.worker", "worker")
+      .where("debt.deletedAt IS NULL");
+
+    // Apply same filters as findAll
+    if (options.workerId)
+      qb.andWhere("worker.id = :workerId", { workerId: options.workerId });
+    if (options.sessionId)
+      qb.andWhere("debt.sessionId = :sessionId", {
+        sessionId: options.sessionId,
+      });
+    if (options.status)
+      qb.andWhere("debt.status = :status", { status: options.status });
+    if (options.dueDateStart)
+      qb.andWhere("debt.dueDate >= :dueDateStart", {
+        dueDateStart: new Date(options.dueDateStart),
+      });
+    if (options.dueDateEnd)
+      qb.andWhere("debt.dueDate <= :dueDateEnd", {
+        dueDateEnd: new Date(options.dueDateEnd),
+      });
+    if (options.minAmount)
+      qb.andWhere("debt.amount >= :minAmount", {
+        minAmount: options.minAmount,
+      });
+    if (options.maxAmount)
+      qb.andWhere("debt.amount <= :maxAmount", {
+        maxAmount: options.maxAmount,
+      });
+    if (options.search)
+      qb.andWhere(
+        "(debt.description LIKE :search OR worker.name LIKE :search)",
+        { search: `%${options.search}%` },
+      );
+
+    const totalDebts = await qb.getCount();
+    const totalAmountResult = await qb
+      .clone()
+      .select("SUM(debt.amount)", "totalAmount")
+      .getRawOne();
+    const totalBalanceResult = await qb
+      .clone()
+      .select("SUM(debt.balance)", "totalBalance")
+      .getRawOne();
+    const overdueCount = await qb
+      .clone()
+      .andWhere(
+        "debt.dueDate < :today AND debt.balance > 0 AND debt.status NOT IN (:...excludedStatuses)",
+        {
+          today: new Date(),
+          excludedStatuses: ["paid", "cancelled", "settled"],
+        },
+      )
+      .getCount();
+    const avgInterestResult = await qb
+      .clone()
+      .select("AVG(debt.interestRate)", "avgInterest")
+      .getRawOne();
+    const averageInterest = parseFloat(avgInterestResult.avgInterest) || 0;
+
+    return {
+      totalDebts,
+      totalAmount: parseFloat(totalAmountResult.totalAmount) || 0,
+      totalBalance: parseFloat(totalBalanceResult.totalBalance) || 0,
+      overdueCount,
+      averageInterest,
+    };
   }
 }
 

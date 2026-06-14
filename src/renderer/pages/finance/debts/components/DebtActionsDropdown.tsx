@@ -1,30 +1,21 @@
 // src/renderer/pages/finance/debts/components/DebtActionsDropdown.tsx
 import React, { useRef, useEffect, useState } from "react";
-import {
-  Eye,
-  Edit,
-  GitBranch,
-  MoreVertical,
-  CreditCard,
-} from "lucide-react";
+import { Eye, MoreVertical, CreditCard, XCircle } from "lucide-react";
 import { dialogs } from "../../../../utils/dialogs";
 import type { DebtWithDetails } from "../types";
 
 interface DebtActionsDropdownProps {
   debt: DebtWithDetails;
   onView: (debt: DebtWithDetails) => void;
-  onEdit: (debt: DebtWithDetails) => void;
-  onDelete?: (id: number) => void; // kept optional but not used
-  onChangeStatus: (debt: DebtWithDetails) => void;
   onRecordPayment: (debt: DebtWithDetails) => void;
+  onCancel: (debt: DebtWithDetails) => void;
 }
 
 const DebtActionsDropdown: React.FC<DebtActionsDropdownProps> = ({
   debt,
   onView,
-  onEdit,
-  onChangeStatus,
   onRecordPayment,
+  onCancel,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -54,38 +45,24 @@ const DebtActionsDropdown: React.FC<DebtActionsDropdownProps> = ({
   const getDropdownPosition = () => {
     if (!buttonRef.current) return {};
     const rect = buttonRef.current.getBoundingClientRect();
-    const dropdownHeight = 240; // reduced because no delete button
+    const dropdownHeight = 160; // increased for cancel button
     const windowHeight = window.innerHeight;
     if (rect.bottom + dropdownHeight > windowHeight) {
-      return {
-        bottom: `${windowHeight - rect.top + 5}px`,
-        right: `${window.innerWidth - rect.right}px`,
-      };
+      return { bottom: `${windowHeight - rect.top + 5}px`, right: `${window.innerWidth - rect.right}px` };
     }
-    return {
-      top: `${rect.bottom + 5}px`,
-      right: `${window.innerWidth - rect.right}px`,
-    };
+    return { top: `${rect.bottom + 5}px`, right: `${window.innerWidth - rect.right}px` };
   };
 
-  const isLocked =
-    debt.status === "paid" ||
-    debt.status === "cancelled" ||
-    debt.status === "settled";
+  const isLocked = debt.status === "paid" || debt.status === "cancelled" || debt.status === "settled";
 
-  const handleStatusClick = () => {
+  const handleCancelClick = () => {
     if (isLocked) {
-      dialogs.warning(
-        `Cannot change status of a ${debt.status} debt.`,
-        "Status Locked",
-      );
+      dialogs.warning(`Cannot cancel a ${debt.status} debt.`, "Action Not Allowed");
       setIsOpen(false);
       return;
     }
-    handleAction(() => onChangeStatus(debt));
+    handleAction(() => onCancel(debt));
   };
-
-  const handleRecordClick = () => handleAction(() => onRecordPayment(debt));
 
   return (
     <div className="debt-actions-dropdown-container" ref={dropdownRef}>
@@ -113,70 +90,43 @@ const DebtActionsDropdown: React.FC<DebtActionsDropdownProps> = ({
           }}
         >
           <div className="py-1">
+            {/* View Details */}
             <button
               onClick={() => handleAction(() => onView(debt))}
               className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "var(--card-hover-bg)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--card-hover-bg)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <Eye className="w-4 h-4 text-sky-500" />
               <span>View Details</span>
             </button>
-            {!isLocked && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(debt);
-                  setIsOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
-                style={{ color: "var(--text-primary)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor =
-                    "var(--card-hover-bg)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "transparent")
-                }
-              >
-                <Edit className="w-4 h-4 text-yellow-500" />
-                <span>Edit Debt</span>
-              </button>
-            )}
-            <button
-              onClick={handleStatusClick}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
-              style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "var(--card-hover-bg)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              <GitBranch className="w-4 h-4 text-blue-500" />
-              <span>Change Status</span>
-            </button>
+
+            {/* Record Payment (only if not locked and balance > 0) */}
             {!isLocked && debt.balance > 0 && (
               <button
-                onClick={handleRecordClick}
+                onClick={() => handleAction(() => onRecordPayment(debt))}
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
                 style={{ color: "var(--text-primary)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor =
-                    "var(--card-hover-bg)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "transparent")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--card-hover-bg)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
               >
                 <CreditCard className="w-4 h-4 text-emerald-500" />
                 <span>Record Payment</span>
+              </button>
+            )}
+
+            {/* Cancel Debt (only if not locked) */}
+            {!isLocked && (
+              <button
+                onClick={handleCancelClick}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                style={{ color: "var(--text-primary)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--card-hover-bg)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                <XCircle className="w-4 h-4 text-red-500" />
+                <span>Cancel Debt</span>
               </button>
             )}
           </div>

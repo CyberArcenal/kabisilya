@@ -41,9 +41,12 @@ class PitakService {
    * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
-    const qrType = qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
     const hasManager = qr && typeof qr === "object" && !!qr.manager;
-    console.log(`[Pitak._getRepo] qr type: ${qrType}, has manager: ${hasManager}`);
+    console.log(
+      `[Pitak._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
 
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
@@ -84,7 +87,9 @@ class PitakService {
     try {
       if (!data.bukidId) throw new Error("bukidId is required");
 
-      const bukid = await bukidRepo.findOne({ where: { id: data.bukidId, deletedAt: null } });
+      const bukid = await bukidRepo.findOne({
+        where: { id: data.bukidId, deletedAt: null },
+      });
       if (!bukid) throw new Error(`Bukid with ID ${data.bukidId} not found`);
 
       // Auto-generate location if not provided
@@ -102,7 +107,9 @@ class PitakService {
         },
       });
       if (existing) {
-        throw new Error(`A pitak with location "${location}" already exists in this bukid`);
+        throw new Error(
+          `A pitak with location "${location}" already exists in this bukid`,
+        );
       }
 
       const pitakData = {
@@ -110,6 +117,7 @@ class PitakService {
         location,
         description: data.description || null,
         area: data.area || null,
+        totalLuwang: data.totalLuwang || 0,
         status: data.status || "active",
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -150,16 +158,23 @@ class PitakService {
       const oldData = { ...existing };
 
       if (data.bukidId !== undefined) {
-        const bukid = await bukidRepo.findOne({ where: { id: data.bukidId, deletedAt: null } });
+        const bukid = await bukidRepo.findOne({
+          where: { id: data.bukidId, deletedAt: null },
+        });
         if (!bukid) throw new Error(`Bukid with ID ${data.bukidId} not found`);
         existing.bukid = bukid;
         delete data.bukidId;
       }
 
       // If location or bukid changed, check uniqueness
-      const newLocation = data.location !== undefined ? data.location : existing.location;
-      const newBukid = data.bukidId !== undefined ? existing.bukid : existing.bukid;
-      if ((data.location !== undefined && data.location !== existing.location) || data.bukidId !== undefined) {
+      const newLocation =
+        data.location !== undefined ? data.location : existing.location;
+      const newBukid =
+        data.bukidId !== undefined ? existing.bukid : existing.bukid;
+      if (
+        (data.location !== undefined && data.location !== existing.location) ||
+        data.bukidId !== undefined
+      ) {
         const duplicate = await pitakRepo.findOne({
           where: {
             bukid: { id: newBukid.id },
@@ -168,7 +183,9 @@ class PitakService {
           },
         });
         if (duplicate && duplicate.id !== id) {
-          throw new Error(`A pitak with location "${newLocation}" already exists in this bukid`);
+          throw new Error(
+            `A pitak with location "${newLocation}" already exists in this bukid`,
+          );
         }
       }
 
@@ -209,14 +226,22 @@ class PitakService {
     };
 
     if (!allowedTransitions[oldStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${oldStatus} to ${newStatus}`);
+      throw new Error(
+        `Invalid status transition from ${oldStatus} to ${newStatus}`,
+      );
     }
 
     pitak.status = newStatus;
     pitak.updatedAt = new Date();
 
     const saved = await updateDb(pitakRepo, pitak, { queryRunner: qr });
-    await auditLogger.logUpdate("Pitak", id, { status: oldStatus }, { status: newStatus }, user);
+    await auditLogger.logUpdate(
+      "Pitak",
+      id,
+      { status: oldStatus },
+      { status: newStatus },
+      user,
+    );
     return saved;
   }
 
@@ -262,7 +287,10 @@ class PitakService {
     const pitakRepo = this._getRepo(qr, Pitak);
 
     try {
-      const pitak = await pitakRepo.findOne({ where: { id }, withDeleted: true });
+      const pitak = await pitakRepo.findOne({
+        where: { id },
+        withDeleted: true,
+      });
       if (!pitak) throw new Error(`Pitak with ID ${id} not found`);
       if (!pitak.deletedAt) throw new Error(`Pitak #${id} is not deleted`);
 
@@ -270,7 +298,13 @@ class PitakService {
       pitak.updatedAt = new Date();
 
       const saved = await updateDb(pitakRepo, pitak, { queryRunner: qr });
-      await auditLogger.logUpdate("Pitak", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "Pitak",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Pitak restored: #${id}`);
       return saved;
     } catch (error) {
@@ -356,7 +390,15 @@ class PitakService {
       sessionId = await farmSessionDefaultSessionId();
       if (!sessionId) {
         console.warn("No default session ID available for Pitak.findAll");
-        return { data: [], pagination: { page: options.page || 1, limit: options.limit || 10, total: 0, pages: 0 } };
+        return {
+          data: [],
+          pagination: {
+            page: options.page || 1,
+            limit: options.limit || 10,
+            total: 0,
+            pages: 0,
+          },
+        };
       }
     }
 
@@ -371,9 +413,12 @@ class PitakService {
       qb.andWhere("pitak.status = :status", { status: options.status });
     }
     if (options.search) {
-      qb.andWhere("(pitak.location LIKE :search OR pitak.description LIKE :search)", {
-        search: `%${options.search}%`,
-      });
+      qb.andWhere(
+        "(pitak.location LIKE :search OR pitak.description LIKE :search)",
+        {
+          search: `%${options.search}%`,
+        },
+      );
     }
     if (options.minArea) {
       qb.andWhere("pitak.area >= :minArea", { minArea: options.minArea });
@@ -383,9 +428,19 @@ class PitakService {
     }
 
     // Sorting
-    const sortBy = options.sortBy || "createdAt";
-    const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
-    qb.orderBy(`pitak.${sortBy}`, sortOrder);
+    const sortMap = {
+      location: "pitak.location",
+      "bukid.name": "bukid.name",
+      area: "pitak.area",
+      status: "pitak.status",
+      createdAt: "pitak.createdAt",
+    };
+    let sortBy =
+      options.sortBy && sortMap[options.sortBy]
+        ? sortMap[options.sortBy]
+        : "pitak.createdAt";
+    let sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
+    qb.orderBy(sortBy, sortOrder);
 
     // Pagination using utility
     const result = await paginateQueryBuilder(qb, {
@@ -402,14 +457,28 @@ class PitakService {
    */
   async getStatistics() {
     const { pitak: repo } = await this.getRepositories();
-    const qb = repo.createQueryBuilder("pitak").where("pitak.deletedAt IS NULL");
+    const qb = repo
+      .createQueryBuilder("pitak")
+      .where("pitak.deletedAt IS NULL");
 
     const total = await qb.getCount();
-    const active = await qb.clone().andWhere("pitak.status = :status", { status: "active" }).getCount();
-    const completed = await qb.clone().andWhere("pitak.status = :status", { status: "completed" }).getCount();
-    const cancelled = await qb.clone().andWhere("pitak.status = :status", { status: "cancelled" }).getCount();
+    const active = await qb
+      .clone()
+      .andWhere("pitak.status = :status", { status: "active" })
+      .getCount();
+    const completed = await qb
+      .clone()
+      .andWhere("pitak.status = :status", { status: "completed" })
+      .getCount();
+    const cancelled = await qb
+      .clone()
+      .andWhere("pitak.status = :status", { status: "cancelled" })
+      .getCount();
 
-    const totalAreaSum = await qb.clone().select("SUM(pitak.area)", "sum").getRawOne();
+    const totalAreaSum = await qb
+      .clone()
+      .select("SUM(pitak.area)", "sum")
+      .getRawOne();
     const totalArea = parseFloat(totalAreaSum.sum) || 0;
 
     return {
@@ -417,6 +486,62 @@ class PitakService {
       active,
       completed,
       cancelled,
+      totalArea,
+    };
+  }
+
+  async getStatisticsWithFilters(options = {}) {
+    const { pitak: repo } = await this.getRepositories();
+    const qb = repo
+      .createQueryBuilder("pitak")
+      .leftJoin("pitak.bukid", "bukid")
+      .leftJoin("bukid.session", "session")
+      .where("pitak.deletedAt IS NULL");
+
+    if (options.sessionId) {
+      qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
+    }
+    if (options.bukidId) {
+      qb.andWhere("bukid.id = :bukidId", { bukidId: options.bukidId });
+    }
+    if (options.status) {
+      qb.andWhere("pitak.status = :status", { status: options.status });
+    }
+    if (options.search) {
+      qb.andWhere(
+        "(pitak.location LIKE :search OR pitak.description LIKE :search)",
+        {
+          search: `%${options.search}%`,
+        },
+      );
+    }
+
+    const total = await qb.getCount();
+    const statusCounts = await qb
+      .clone()
+      .select("pitak.status", "status")
+      .addSelect("COUNT(pitak.id)", "count")
+      .groupBy("pitak.status")
+      .getRawMany();
+    const breakdown = statusCounts.reduce((acc, row) => {
+      acc[row.status] = parseInt(row.count, 10);
+      return acc;
+    }, {});
+
+    const totalAreaResult = await qb
+      .clone()
+      .select("SUM(pitak.area)", "totalArea")
+      .getRawOne();
+    const totalArea = parseFloat(totalAreaResult.totalArea) || 0;
+
+    // For total assigned workers, we need a separate query (join assignments)
+    // Optional: compute from frontend for now.
+
+    return {
+      total,
+      active: breakdown.active || 0,
+      completed: breakdown.completed || 0,
+      cancelled: breakdown.cancelled || 0,
       totalArea,
     };
   }
@@ -434,8 +559,16 @@ class PitakService {
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Location", "Description", "Area", "Status",
-        "Bukid ID", "Bukid Name", "Session ID", "Created At", "Updated At"
+        "ID",
+        "Location",
+        "Description",
+        "Area",
+        "Status",
+        "Bukid ID",
+        "Bukid Name",
+        "Session ID",
+        "Created At",
+        "Updated At",
       ];
       const rows = pitaks.map((p) => [
         p.id,

@@ -40,9 +40,13 @@ export type BukidResponse = ApiResponse<Bukid>;
 export type BukidsResponse = ApiResponse<PaginatedResponse<Bukid>>;
 
 export interface BukidStats {
-  totalBukids: number;
-  statusBreakdown: Record<string, number>;
-  pitakDistribution: Array<{ bukidId: number; count: number }>;
+  total: number;
+  active: number;
+  completed: number;
+  cancelled: number;
+  initiated: number;
+  totalArea: number;
+  // totalPitaks: number;// uncomment if needed
 }
 
 export type BukidStatsResponse = ApiResponse<BukidStats>;
@@ -117,9 +121,16 @@ class BukidAPI {
     return this.getAll({ ...params, sessionId });
   }
 
-  async getStats(): Promise<BukidStatsResponse> {
+  async getStats(filters?: {
+    sessionId?: number;
+    status?: string;
+    search?: string;
+  }): Promise<BukidStatsResponse> {
     try {
-      const response = await this.call<BukidStatsResponse>("getBukidStats");
+      const response = await this.call<BukidStatsResponse>(
+        "getBukidStats",
+        filters || {},
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
     } catch (error: any) {

@@ -36,7 +36,10 @@ const ViewDebtModal: React.FC<Props> = ({ isOpen, onClose, debt }) => {
 
   if (!debt) return null;
 
-  const progress = ((debt.amount - debt.balance) / debt.amount) * 100;
+  // Calculate progress percentage (clamped between 0 and 100)
+  const progressPercent = debt.amount > 0
+    ? Math.min(100, Math.max(0, ((debt.amount - debt.balance) / debt.amount) * 100))
+    : 0;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Debt Details" size="lg">
@@ -59,8 +62,11 @@ const ViewDebtModal: React.FC<Props> = ({ isOpen, onClose, debt }) => {
             <label className="text-xs font-medium text-[var(--text-tertiary)]">Balance</label>
             <div className="flex flex-col">
               <span>{formatCurrency(debt.balance)}</span>
-              <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                <div className="bg-[var(--accent-green)] h-1.5 rounded-full" style={{ width: `${progress}%` }} />
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1 overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
             </div>
           </div>

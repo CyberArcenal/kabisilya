@@ -330,9 +330,16 @@ class BukidService {
     }
 
     // Sorting
-    const sortBy = options.sortBy || "createdAt";
-    const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
-    qb.orderBy(`bukid.${sortBy}`, sortOrder);
+  const sortMap = {
+    name: "bukid.name",
+    status: "bukid.status",
+    area: "bukid.area",
+    createdAt: "bukid.createdAt",
+    "session.name": "session.name",
+  };
+  let sortBy = options.sortBy && sortMap[options.sortBy] ? sortMap[options.sortBy] : "bukid.createdAt";
+  let sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
+  qb.orderBy(sortBy, sortOrder);
 
     // Pagination using utility
     const result = await paginateQueryBuilder(qb, {
@@ -370,6 +377,76 @@ class BukidService {
       totalArea,
     };
   }
+
+  /**
+ * Get filtered statistics for bukids (supports same filters as findAll)
+ * @param {Object} options - { sessionId, status, search }
+ * @returns {Promise<Object>} - totals and breakdowns
+ */
+async getStatisticsWithFilters(options = {}) {
+  const { bukid: repo } = await this.getRepositories();
+  const qb = repo
+    .createQueryBuilder("bukid")
+    .leftJoin("bukid.session", "session")
+    .where("bukid.deletedAt IS NULL");
+
+  // Apply filters
+  if (options.sessionId) {
+    qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
+  }
+  if (options.status) {
+    qb.andWhere("bukid.status = :status", { status: options.status });
+  }
+  if (options.search) {
+    qb.andWhere("(bukid.name LIKE :search OR bukid.location LIKE :search OR bukid.description LIKE :search)", {
+      search: `%${options.search}%`,
+    });
+  }
+
+  // Get total count
+  const total = await qb.getCount();
+
+  // Get status breakdown
+  const statusCounts = await qb
+    .clone()
+    .select("bukid.status", "status")
+    .addSelect("COUNT(bukid.id)", "count")
+    .groupBy("bukid.status")
+    .getRawMany();
+
+  const breakdown = statusCounts.reduce((acc, row) => {
+    acc[row.status] = parseInt(row.count, 10);
+    return acc;
+  }, {});
+
+  // Get total area (sum of area)
+  const totalAreaResult = await qb
+    .clone()
+    .select("SUM(bukid.area)", "totalArea")
+    .getRawOne();
+  const totalArea = parseFloat(totalAreaResult.totalArea) || 0;
+
+  // Get total pitaks (sum of pitaks across filtered bukids) – requires joining pitaks
+  // This is optional; if you want total pitaks count for summary cards, uncomment:
+  /*
+  const totalPitaksResult = await qb
+    .clone()
+    .leftJoin("bukid.pitaks", "pitak")
+    .select("COUNT(pitak.id)", "totalPitaks")
+    .getRawOne();
+  const totalPitaks = parseInt(totalPitaksResult.totalPitaks) || 0;
+  */
+
+  return {
+    total,
+    active: breakdown.active || 0,
+    completed: breakdown.completed || 0,
+    cancelled: breakdown.cancelled || 0,
+    initiated: breakdown.initiated || 0,
+    totalArea,
+    // totalPitaks, // uncomment if needed
+  };
+}
 
   /**
    * Export bukids to CSV or JSON

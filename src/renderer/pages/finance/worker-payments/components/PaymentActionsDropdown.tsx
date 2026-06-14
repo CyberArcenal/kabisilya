@@ -1,15 +1,24 @@
 // src/renderer/pages/finance/worker-payments/components/PaymentActionsDropdown.tsx
 import React, { useRef, useEffect, useState } from "react";
-import { Eye, Edit, GitBranch, Trash2, MoreVertical } from "lucide-react";
+import {
+  Eye,
+  Edit,
+  Trash2,
+  MoreVertical,
+  CreditCard,
+  XCircle,
+} from "lucide-react";
 import { dialogs } from "../../../../utils/dialogs";
 import type { PaymentWithDetails } from "../types";
 
 interface PaymentActionsDropdownProps {
   payment: PaymentWithDetails;
   onView: (payment: PaymentWithDetails) => void;
-  onEdit: (payment: PaymentWithDetails) => void;
+  onEdit?: (payment: PaymentWithDetails) => void;
   onDelete: (id: number) => void;
-  onChangeStatus: (payment: PaymentWithDetails) => void;
+  onChangeStatus?: (payment: PaymentWithDetails) => void;
+  onRecordPayment: (payment: PaymentWithDetails) => void;
+  onCancelPayment: (payment: PaymentWithDetails) => void;
 }
 
 const PaymentActionsDropdown: React.FC<PaymentActionsDropdownProps> = ({
@@ -18,6 +27,8 @@ const PaymentActionsDropdown: React.FC<PaymentActionsDropdownProps> = ({
   onEdit,
   onDelete,
   onChangeStatus,
+  onRecordPayment,
+  onCancelPayment,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -47,7 +58,7 @@ const PaymentActionsDropdown: React.FC<PaymentActionsDropdownProps> = ({
   const getDropdownPosition = () => {
     if (!buttonRef.current) return {};
     const rect = buttonRef.current.getBoundingClientRect();
-    const dropdownHeight = 220;
+    const dropdownHeight = 260; // a bit larger
     const windowHeight = window.innerHeight;
 
     if (rect.bottom + dropdownHeight > windowHeight) {
@@ -67,22 +78,22 @@ const PaymentActionsDropdown: React.FC<PaymentActionsDropdownProps> = ({
   const handleDeleteClick = async () => {
     const confirmed = await dialogs.confirm({
       title: "Delete Payment",
-      message: `Are you sure you want to delete this payment?`,
+      message: "Are you sure you want to delete this payment?",
     });
     if (!confirmed) return;
     handleAction(() => onDelete(payment.id));
   };
 
-  const handleStatusClick = () => {
+  const handleCancelPaymentClick = () => {
     if (isLocked) {
       dialogs.warning(
-        `Cannot change status of a ${payment.status} payment.`,
-        "Status Locked"
+        `Cannot cancel a ${payment.status} payment.`,
+        "Action Not Allowed"
       );
       setIsOpen(false);
       return;
     }
-    handleAction(() => onChangeStatus(payment));
+    handleAction(() => onCancelPayment(payment));
   };
 
   return (
@@ -112,11 +123,9 @@ const PaymentActionsDropdown: React.FC<PaymentActionsDropdownProps> = ({
           }}
         >
           <div className="py-1">
+            {/* View Details - always visible */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAction(() => onView(payment));
-              }}
+              onClick={() => handleAction(() => onView(payment))}
               className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
               style={{ color: "var(--text-primary)" }}
               onMouseEnter={(e) => {
@@ -130,13 +139,29 @@ const PaymentActionsDropdown: React.FC<PaymentActionsDropdownProps> = ({
               <span>View Details</span>
             </button>
 
+            {/* Record Payment – only if not locked */}
             {!isLocked && (
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAction(() => onEdit(payment));
-                }}
+                onClick={() => handleAction(() => onRecordPayment(payment))}
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                style={{ color: "var(--text-primary)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <CreditCard className="w-4 h-4 text-emerald-500" />
+                <span>Record Payment</span>
+              </button>
+            )}
+
+            {/* Edit – only if not locked */}
+            {!isLocked && (
+              <button
+                onClick={() => handleAction(() => onEdit?.(payment))}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors hidden"
                 style={{ color: "var(--text-primary)" }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
@@ -150,27 +175,28 @@ const PaymentActionsDropdown: React.FC<PaymentActionsDropdownProps> = ({
               </button>
             )}
 
-            <button
-              onClick={handleStatusClick}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
-              style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              <GitBranch className="w-4 h-4 text-blue-500" />
-              <span>Change Status</span>
-            </button>
+            {/* Cancel Payment – only if not locked and status is pending/partially_paid */}
+            {!isLocked && (payment.status === "pending" || payment.status === "partially_paid") && (
+              <button
+                onClick={handleCancelPaymentClick}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                style={{ color: "var(--text-primary)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <XCircle className="w-4 h-4 text-red-500" />
+                <span>Cancel Payment</span>
+              </button>
+            )}
 
+            {/* Delete – only if not locked */}
             {!isLocked && (
               <>
-                <div
-                  className="border-t my-1"
-                  style={{ borderColor: "var(--border-color)" }}
-                ></div>
+                <div className="border-t my-1" style={{ borderColor: "var(--border-color)" }} />
                 <button
                   onClick={handleDeleteClick}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"

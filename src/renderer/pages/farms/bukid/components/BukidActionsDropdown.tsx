@@ -1,6 +1,6 @@
 // src/renderer/pages/farms/bukid/components/BukidActionsDropdown.tsx
 import React, { useRef, useEffect, useState } from "react";
-import { Eye, Edit, GitBranch, Trash2, MoreVertical } from "lucide-react";
+import { Eye, Edit, GitBranch, Trash2, MoreVertical, PlusCircle } from "lucide-react";
 import { dialogs } from "../../../../utils/dialogs";
 import type { BukidWithPitaks } from "../hooks/useBukids";
 
@@ -10,6 +10,7 @@ interface BukidActionsDropdownProps {
   onEdit: (bukid: BukidWithPitaks) => void;
   onDelete: (id: number) => void;
   onChangeStatus: (bukid: BukidWithPitaks) => void;
+  onAddPlot?: (bukid: BukidWithPitaks) => void; // new
 }
 
 const BukidActionsDropdown: React.FC<BukidActionsDropdownProps> = ({
@@ -18,6 +19,7 @@ const BukidActionsDropdown: React.FC<BukidActionsDropdownProps> = ({
   onEdit,
   onDelete,
   onChangeStatus,
+  onAddPlot,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -48,7 +50,7 @@ const BukidActionsDropdown: React.FC<BukidActionsDropdownProps> = ({
   const getDropdownPosition = () => {
     if (!buttonRef.current) return {};
     const rect = buttonRef.current.getBoundingClientRect();
-    const dropdownHeight = 220;
+    const dropdownHeight = 260; // increased for new button
     const windowHeight = window.innerHeight;
 
     if (rect.bottom + dropdownHeight > windowHeight) {
@@ -76,7 +78,7 @@ const BukidActionsDropdown: React.FC<BukidActionsDropdownProps> = ({
     if (isLocked) {
       dialogs.warning(
         `Cannot change status of a ${bukid.status} farm.`,
-        "Status Locked",
+        "Status Locked"
       );
       setIsOpen(false);
       return;
@@ -84,14 +86,19 @@ const BukidActionsDropdown: React.FC<BukidActionsDropdownProps> = ({
     handleAction(() => onChangeStatus(bukid));
   };
 
+  const handleAddPlotClick = () => {
+    if (isLocked) {
+      dialogs.warning(`Cannot add plot to a ${bukid.status} farm.`, "Action Not Allowed");
+      setIsOpen(false);
+      return;
+    }
+    handleAction(() => onAddPlot?.(bukid));
+  };
+
   const dropdownStyle = {
     backgroundColor: "var(--card-bg)",
     borderColor: "var(--border-color)",
     color: "var(--text-primary)",
-  };
-
-  const buttonHoverStyle = {
-    backgroundColor: "var(--card-hover-bg)",
   };
 
   return (
@@ -138,6 +145,24 @@ const BukidActionsDropdown: React.FC<BukidActionsDropdownProps> = ({
               <span>View Details</span>
             </button>
 
+            {/* Add Plot (only if not locked) */}
+            {!isLocked && (
+              <button
+                onClick={handleAddPlotClick}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                style={{ color: "var(--text-primary)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <PlusCircle className="w-4 h-4 text-emerald-500" />
+                <span>Add Plot</span>
+              </button>
+            )}
+
             {/* Edit (only if not locked) */}
             {!isLocked && (
               <button
@@ -148,8 +173,7 @@ const BukidActionsDropdown: React.FC<BukidActionsDropdownProps> = ({
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
                 style={{ color: "var(--text-primary)" }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "var(--card-hover-bg)";
+                  e.currentTarget.style.backgroundColor = "var(--card-hover-bg)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "transparent";

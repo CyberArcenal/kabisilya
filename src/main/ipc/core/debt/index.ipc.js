@@ -19,6 +19,7 @@ class DebtHandler {
     this.getDebtStats = this.importHandler("./get/stats.ipc");
 
     // WRITE
+    this.payDebt = this.importHandler("./pay_debt.ipc");
     this.createDebt = this.importHandler("./create.ipc");
     this.updateDebt = this.importHandler("./update.ipc");
     this.deleteDebt = this.importHandler("./delete.ipc");
@@ -68,6 +69,8 @@ class DebtHandler {
           return await this.handleWithTransaction(this.updateDebt, params);
         case "updateStatus":
           return await this.handleWithTransaction(this.updateStatus, params);
+        case "payDebt":
+          return await this.handleWithTransaction(this.payDebt, params);
         case "deleteDebt":
           return await this.handleWithTransaction(this.deleteDebt, params);
         default:

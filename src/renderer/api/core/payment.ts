@@ -34,6 +34,9 @@ export interface Payment {
   assignment?: Assignment | null;
   history?: PaymentHistory[];
   debtPayments?: Debt[];
+  amountPaid?: number | null;
+  lastPaymentDate?: string | null;
+  debtDeductionTotal?: number | null;
 }
 
 export interface PaymentCreateData {
@@ -65,11 +68,10 @@ export type PaymentResponse = ApiResponse<Payment>;
 export type PaymentsResponse = ApiResponse<PaginatedResponse<Payment>>;
 
 export interface PaymentStats {
-  totalPayments: number;
-  statusBreakdown: Record<string, number>;
   totalGross: number;
   totalNet: number;
-  totalDeductions: number;
+  totalDebtDeduction: number;
+  breakdown: Record<string, number>;
 }
 
 export type PaymentStatsResponse = ApiResponse<PaymentStats>;
@@ -90,7 +92,10 @@ export interface PaymentFilters extends BaseFilters {
 class PaymentAPI {
   private channel = "payment";
 
-  private async call<T = any>(method: string, params: Record<string, any> = {}): Promise<T> {
+  private async call<T = any>(
+    method: string,
+    params: Record<string, any> = {},
+  ): Promise<T> {
     if (!window.backendAPI?.payment) {
       throw new Error(`Electron API (${this.channel}) not available`);
     }
@@ -123,7 +128,9 @@ class PaymentAPI {
   async getById(id: number): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<PaymentResponse>("getPaymentById", { id });
+      const response = await this.call<PaymentResponse>("getPaymentById", {
+        id,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch payment");
     } catch (error: any) {
@@ -131,27 +138,36 @@ class PaymentAPI {
     }
   }
 
-  async getByWorker(workerId: number, params?: Omit<PaymentFilters, "workerId">): Promise<PaymentsResponse> {
+  async getByWorker(
+    workerId: number,
+    params?: Omit<PaymentFilters, "workerId">,
+  ): Promise<PaymentsResponse> {
     return this.getAll({ ...params, workerId });
   }
 
-  async getByPitak(pitakId: number, params?: Omit<PaymentFilters, "pitakId">): Promise<PaymentsResponse> {
+  async getByPitak(
+    pitakId: number,
+    params?: Omit<PaymentFilters, "pitakId">,
+  ): Promise<PaymentsResponse> {
     return this.getAll({ ...params, pitakId });
   }
 
-  async getBySession(sessionId: number, params?: Omit<PaymentFilters, "sessionId">): Promise<PaymentsResponse> {
+  async getBySession(
+    sessionId: number,
+    params?: Omit<PaymentFilters, "sessionId">,
+  ): Promise<PaymentsResponse> {
     return this.getAll({ ...params, sessionId });
   }
 
-  async getStats(sessionId?: number): Promise<PaymentStatsResponse> {
-    try {
-      const response = await this.call<PaymentStatsResponse>("getPaymentStats", { sessionId });
-      if (response.status) return response;
-      throw new Error(response.message || "Failed to fetch stats");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch stats");
-    }
+async getStats(filters?: PaymentFilters): Promise<PaymentStatsResponse> {
+  try {
+    const response = await this.call<PaymentStatsResponse>("getPaymentStats", filters || {});
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch stats");
+  } catch (error: any) {
+    throw new Error(error.message || "Failed to fetch stats");
   }
+}
 
   async create(data: PaymentCreateData): Promise<PaymentResponse> {
     try {
@@ -159,7 +175,10 @@ class PaymentAPI {
       if (data.amount === undefined && data.grossPay !== undefined) {
         payload.amount = data.grossPay;
       }
-      const response = await this.call<PaymentResponse>("createPayment", payload);
+      const response = await this.call<PaymentResponse>(
+        "createPayment",
+        payload,
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to create payment");
     } catch (error: any) {
@@ -170,7 +189,10 @@ class PaymentAPI {
   async update(id: number, data: PaymentUpdateData): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<PaymentResponse>("updatePayment", { id, ...data });
+      const response = await this.call<PaymentResponse>("updatePayment", {
+        id,
+        ...data,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update payment");
     } catch (error: any) {
@@ -181,7 +203,10 @@ class PaymentAPI {
   async updateStatus(id: number, status: string): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<PaymentResponse>("updateStatus", { id, status });
+      const response = await this.call<PaymentResponse>("updateStatus", {
+        id,
+        status,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update payment status");
     } catch (error: any) {
@@ -192,7 +217,9 @@ class PaymentAPI {
   async delete(id: number): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<PaymentResponse>("deletePayment", { id });
+      const response = await this.call<PaymentResponse>("deletePayment", {
+        id,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to delete payment");
     } catch (error: any) {
@@ -203,11 +230,35 @@ class PaymentAPI {
   async restore(id: number): Promise<PaymentResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<PaymentResponse>("restorePayment", { id });
+      const response = await this.call<PaymentResponse>("restorePayment", {
+        id,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to restore payment");
     } catch (error: any) {
       throw new Error(error.message || "Failed to restore payment");
+    }
+  }
+  async recordPayment(
+    id: number,
+    data: {
+      amountPaid: number;
+      applyToDebt?: number;
+      paymentMethod?: string;
+      referenceNumber?: string;
+      notes?: string;
+    },
+  ): Promise<PaymentResponse> {
+    try {
+      if (!id || id <= 0) throw new Error("Invalid ID");
+      const response = await this.call<PaymentResponse>("recordPayment", {
+        id,
+        ...data,
+      });
+      if (response.status) return response;
+      throw new Error(response.message || "Failed to record payment");
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to record payment");
     }
   }
 }

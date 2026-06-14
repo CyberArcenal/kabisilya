@@ -35,10 +35,27 @@ const Payment = new EntitySchema({
     deductionBreakdown: { type: "json", nullable: true },
     notes: { type: String, nullable: true },
     createdAt: { type: Date, createDate: true },
-      deletedAt: { type: Date, nullable: true },
+    deletedAt: { type: Date, nullable: true },
     updatedAt: { type: Date, updateDate: true },
     // optional idempotency key
     idempotencyKey: { type: String, nullable: true },
+
+    amountPaid: {
+      type: "decimal",
+      precision: 10,
+      scale: 2,
+      default: 0.0,
+    },
+    lastPaymentDate: {
+      type: Date,
+      nullable: true,
+    },
+    debtDeductionTotal: {
+      type: "decimal",
+      precision: 10,
+      scale: 2,
+      default: 0.0,
+    },
   },
   relations: {
     worker: {

@@ -1,273 +1,119 @@
 // src/renderer/pages/finance/worker-payments/hooks/usePayments.ts
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useModal } from "../../../../hooks/useModal";
-import { dialogs } from "../../../../utils/dialogs";
-import type { PaymentWithDetails, PaymentFormData } from "../types";
+import { useCallback, useEffect, useState } from "react";
+import { usePaymentsCore } from "./usePaymentsCore";
+import { usePaymentsFilters } from "./usePaymentsFilters";
+import { usePaymentsPagination } from "./usePaymentsPagination";
+import { usePaymentsSorting } from "./usePaymentsSorting";
+import { usePaymentsModals } from "./usePaymentsModals";
+import { usePaymentsActions } from "./usePaymentsActions";
+import type { PaymentWithDetails } from "../types";
 import paymentAPI from "../../../../api/core/payment";
-
-const PAGE_SIZE = 10;
-const DEBOUNCE_MS = 300;
+import { usePaymentsStats } from "./usePaymentsStats";
+import { dialogs } from "../../../../utils/dialogs";
 
 export const usePayments = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Core data
+  const { payments, loading, totalCount, totalPages, fetchPayments } =
+    usePaymentsCore();
 
-  const [payments, setPayments] = useState<PaymentWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPageState] = useState(() => {
-    const p = searchParams.get("page");
-    return p ? parseInt(p, 10) : 1;
+  // Filters – destructure individual filter values
+  const {
+    filters,
+    setSearchRaw,
+    setWorkerIdRaw,
+    setSessionIdRaw,
+    setStatusRaw,
+    setStartDateRaw,
+    setEndDateRaw,
+    resetFilters,
+    createSetter,
+    debounceRefs,
+  } = usePaymentsFilters();
+
+  const { search, workerId, sessionId, status, startDate, endDate } = filters;
+
+  // Pagination
+  const { page, limit, setPage, setLimit } = usePaymentsPagination();
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // Sorting
+  const { sortBy, sortOrder, setSort } = usePaymentsSorting();
+
+  // Modals
+  const {
+    selectedPayment,
+    editingPayment,
+    statusChangePayment,
+    recordPayment,
+    workerOutstandingDebt,
+    setSelectedPayment,
+    setEditingPayment,
+    setStatusChangePayment,
+    setRecordPayment,
+    setWorkerOutstandingDebt,
+    viewModal,
+    formModal,
+    statusModal,
+    recordModal,
+  } = usePaymentsModals();
+
+  const { stats, statsLoading } = usePaymentsStats({
+    search: filters.search,
+    workerId: filters.workerId,
+    sessionId: filters.sessionId,
+    status: filters.status,
+    startDate: filters.startDate,
+    endDate: filters.endDate,
   });
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
 
-  // Filters (initialized from URL)
-  const [search, setSearchState] = useState(() => searchParams.get("search") || "");
-  const [workerId, setWorkerIdState] = useState<number | undefined>(() => {
-    const id = searchParams.get("worker");
-    return id ? parseInt(id, 10) : undefined;
-  });
-  const [sessionId, setSessionIdState] = useState<number | undefined>(() => {
-    const id = searchParams.get("session");
-    return id ? parseInt(id, 10) : undefined;
-  });
-  const [status, setStatusState] = useState(() => searchParams.get("status") || "");
-  const [startDate, setStartDateState] = useState(() => searchParams.get("startDate") || "");
-  const [endDate, setEndDateState] = useState(() => searchParams.get("endDate") || "");
-
-  // Selected for modals
-  const [selectedPayment, setSelectedPayment] = useState<PaymentWithDetails | null>(null);
-  const [editingPayment, setEditingPayment] = useState<(PaymentFormData & { id: number }) | null>(null);
-  const [statusChangePayment, setStatusChangePayment] = useState<PaymentWithDetails | null>(null);
-
-  const viewModal = useModal();
-  const formModal = useModal();
-  const statusModal = useModal();
-
-  // Refs for abort and debounce
-  const isMountedRef = useRef(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const debounceRefs = {
-    search: useRef<NodeJS.Timeout>(),
-    workerId: useRef<NodeJS.Timeout>(),
-    sessionId: useRef<NodeJS.Timeout>(),
-    status: useRef<NodeJS.Timeout>(),
-    startDate: useRef<NodeJS.Timeout>(),
-    endDate: useRef<NodeJS.Timeout>(),
-  };
-
-  // Update URL helper
-  const updateUrl = useCallback(
-    (
-      newPage: number,
-      newSearch: string,
-      newWorkerId: number | undefined,
-      newSessionId: number | undefined,
-      newStatus: string,
-      newStartDate: string,
-      newEndDate: string
-    ) => {
-      const params: Record<string, string> = {};
-      if (newSearch) params.search = newSearch;
-      if (newWorkerId) params.worker = newWorkerId.toString();
-      if (newSessionId) params.session = newSessionId.toString();
-      if (newStatus) params.status = newStatus;
-      if (newStartDate) params.startDate = newStartDate;
-      if (newEndDate) params.endDate = newEndDate;
-      if (newPage > 1) params.page = newPage.toString();
-      setSearchParams(params, { replace: true });
-    },
-    [setSearchParams]
+  // Actions
+  const {
+    handleDelete,
+    handleRecordPayment,
+    handleCancelPayment,
+    handleChangeStatus,
+  } = usePaymentsActions(
+    fetchPayments,
+    setRecordPayment,
+    setWorkerOutstandingDebt,
+    recordModal,
   );
 
-  // Sync URL changes (browser back/forward) to state
-  useEffect(() => {
-    const urlPage = searchParams.get("page");
-    const urlSearch = searchParams.get("search") || "";
-    const urlWorker = searchParams.get("worker");
-    const urlSession = searchParams.get("session");
-    const urlStatus = searchParams.get("status") || "";
-    const urlStartDate = searchParams.get("startDate") || "";
-    const urlEndDate = searchParams.get("endDate") || "";
-
-    let needsUpdate = false;
-    const newPage = urlPage ? parseInt(urlPage, 10) : 1;
-    if (newPage !== page) {
-      setPageState(newPage);
-      needsUpdate = true;
-    }
-    if (urlSearch !== search) {
-      setSearchState(urlSearch);
-      needsUpdate = true;
-    }
-    const newWorkerId = urlWorker ? parseInt(urlWorker, 10) : undefined;
-    if (newWorkerId !== workerId) {
-      setWorkerIdState(newWorkerId);
-      needsUpdate = true;
-    }
-    const newSessionId = urlSession ? parseInt(urlSession, 10) : undefined;
-    if (newSessionId !== sessionId) {
-      setSessionIdState(newSessionId);
-      needsUpdate = true;
-    }
-    if (urlStatus !== status) {
-      setStatusState(urlStatus);
-      needsUpdate = true;
-    }
-    if (urlStartDate !== startDate) {
-      setStartDateState(urlStartDate);
-      needsUpdate = true;
-    }
-    if (urlEndDate !== endDate) {
-      setEndDateState(urlEndDate);
-      needsUpdate = true;
-    }
-  }, [searchParams]);
-
-  // Setters with URL update (debounced)
-  const setPage = (newPage: number) => {
-    if (newPage === page) return;
-    setPageState(newPage);
-    updateUrl(newPage, search, workerId, sessionId, status, startDate, endDate);
-  };
-
-  const setSearch = (val: string) => {
-    setSearchState(val);
-    if (debounceRefs.search.current) clearTimeout(debounceRefs.search.current);
-    debounceRefs.search.current = setTimeout(() => {
-      updateUrl(1, val, workerId, sessionId, status, startDate, endDate);
-      setPageState(1);
-    }, DEBOUNCE_MS);
-  };
-
-  const setWorkerId = (val: number | undefined) => {
-    setWorkerIdState(val);
-    if (debounceRefs.workerId.current) clearTimeout(debounceRefs.workerId.current);
-    debounceRefs.workerId.current = setTimeout(() => {
-      updateUrl(1, search, val, sessionId, status, startDate, endDate);
-      setPageState(1);
-    }, DEBOUNCE_MS);
-  };
-
-  const setSessionId = (val: number | undefined) => {
-    setSessionIdState(val);
-    if (debounceRefs.sessionId.current) clearTimeout(debounceRefs.sessionId.current);
-    debounceRefs.sessionId.current = setTimeout(() => {
-      updateUrl(1, search, workerId, val, status, startDate, endDate);
-      setPageState(1);
-    }, DEBOUNCE_MS);
-  };
-
-  const setStatus = (val: string) => {
-    setStatusState(val);
-    if (debounceRefs.status.current) clearTimeout(debounceRefs.status.current);
-    debounceRefs.status.current = setTimeout(() => {
-      updateUrl(1, search, workerId, sessionId, val, startDate, endDate);
-      setPageState(1);
-    }, DEBOUNCE_MS);
-  };
-
-  const setStartDate = (val: string) => {
-    setStartDateState(val);
-    if (debounceRefs.startDate.current) clearTimeout(debounceRefs.startDate.current);
-    debounceRefs.startDate.current = setTimeout(() => {
-      updateUrl(1, search, workerId, sessionId, status, val, endDate);
-      setPageState(1);
-    }, DEBOUNCE_MS);
-  };
-
-  const setEndDate = (val: string) => {
-    setEndDateState(val);
-    if (debounceRefs.endDate.current) clearTimeout(debounceRefs.endDate.current);
-    debounceRefs.endDate.current = setTimeout(() => {
-      updateUrl(1, search, workerId, sessionId, status, startDate, val);
-      setPageState(1);
-    }, DEBOUNCE_MS);
-  };
-
-  const resetFilters = () => {
-    setSearchState("");
-    setWorkerIdState(undefined);
-    setSessionIdState(undefined);
-    setStatusState("");
-    setStartDateState("");
-    setEndDateState("");
-    setPageState(1);
-    updateUrl(1, "", undefined, undefined, "", "", "");
-  };
-
-  // Cleanup
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      abortControllerRef.current?.abort();
-      Object.values(debounceRefs).forEach(ref => {
-        if (ref.current) clearTimeout(ref.current);
-      });
+  // Stable refresh function that builds params and fetches
+  const refresh = useCallback(() => {
+    const params = {
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      search,
+      workerId,
+      sessionId,
+      status,
+      startDate,
+      endDate,
     };
-  }, []);
+    fetchPayments(params);
+  }, [
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+    search,
+    workerId,
+    sessionId,
+    status,
+    startDate,
+    endDate,
+    fetchPayments,
+  ]);
 
-  // Fetch payments
-  const fetchPayments = useCallback(async () => {
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    if (!isMountedRef.current) return;
-    setLoading(true);
-
-    try {
-      const params: any = {
-        page,
-        limit: PAGE_SIZE,
-        sortBy: "paymentDate",
-        sortOrder: "DESC",
-      };
-      if (search) params.search = search;
-      if (workerId) params.workerId = workerId;
-      if (sessionId) params.sessionId = sessionId;
-      if (status) params.status = status;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
-      const res = await paymentAPI.getAll(params);
-      if (controller.signal.aborted || !isMountedRef.current) return;
-      if (!res.status) throw new Error(res.message || "Failed to fetch payments");
-
-      setPayments(res.data.items);
-      setTotalCount(res.data.pagination.total);
-      setTotalPages(res.data.pagination.pages);
-    } catch (error: any) {
-      if (error.name === "AbortError") return;
-      console.error("Failed to fetch payments", error);
-    } finally {
-      if (isMountedRef.current && !controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
-  }, [page, search, workerId, sessionId, status, startDate, endDate]);
-
+  // Fetch when dependencies change
   useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+    refresh();
+  }, [refresh]);
 
-  // CRUD Handlers
-  const handleDelete = async (id: number) => {
-    const confirmed = await dialogs.confirm({
-      title: "Delete Payment",
-      message: "Are you sure you want to delete this payment?",
-    });
-    if (confirmed) {
-      try {
-        await paymentAPI.delete(id);
-        await fetchPayments();
-      } catch (error) {
-        console.error("Failed to delete payment", error);
-      }
-    }
-  };
-
+  // Handlers for modals
   const handleView = (payment: PaymentWithDetails) => {
     setSelectedPayment(payment);
     viewModal.open();
@@ -298,48 +144,168 @@ export const usePayments = () => {
   const handleFormSuccess = () => {
     formModal.close();
     setEditingPayment(null);
-    fetchPayments();
-  };
-
-  const handleChangeStatus = (payment: PaymentWithDetails) => {
-    setStatusChangePayment(payment);
-    statusModal.open();
+    refresh();
   };
 
   const handleConfirmStatusChange = async (newStatus: string) => {
     if (!statusChangePayment) return;
-    await paymentAPI.updateStatus(statusChangePayment.id, newStatus);
-    await fetchPayments();
+    await handleChangeStatus(statusChangePayment, newStatus);
     setStatusChangePayment(null);
+    refresh();
   };
 
+  const handleConfirmRecord = async (data: any) => {
+    if (!recordPayment) return;
+    await paymentAPI.recordPayment(recordPayment.id, data);
+    refresh();
+    recordModal.close();
+    setRecordPayment(null);
+  };
+
+  const bulkDelete = useCallback(
+    async (ids: number[]) => {
+      const confirmed = await dialogs.confirm({
+        title: "Bulk Delete",
+        message: `Are you sure you want to delete ${ids.length} payment(s)? This action cannot be undone.`,
+        confirmText: "Delete",
+        icon: "danger",
+      });
+      if (!confirmed) return;
+      try {
+        await Promise.all(ids.map((id) => paymentAPI.delete(id)));
+        await refresh();
+        setSelectedIds([]);
+      } catch (error) {
+        console.error("Bulk delete failed", error);
+      }
+    },
+    [refresh],
+  );
+
+  const bulkStatusChange = useCallback(
+    async (ids: number[], newStatus: string) => {
+      const confirmed = await dialogs.confirm({
+        title: "Bulk Status Change",
+        message: `Change ${ids.length} payment(s) to "${newStatus}"?`,
+        confirmText: "Change",
+      });
+      if (!confirmed) return;
+      try {
+        await Promise.all(
+          ids.map((id) => paymentAPI.updateStatus(id, newStatus)),
+        );
+        await refresh();
+        setSelectedIds([]);
+      } catch (error) {
+        console.error("Bulk status change failed", error);
+      }
+    },
+    [refresh],
+  );
+
+  const exportSelected = useCallback(() => {
+    const selectedPayments = payments.filter((p) => selectedIds.includes(p.id));
+    if (selectedPayments.length === 0) return;
+    const headers = [
+      "ID",
+      "Worker",
+      "Pitak",
+      "Gross Pay",
+      "Net Pay",
+      "Amount Paid",
+      "Last Payment Date",
+      "Status",
+      "Payment Date",
+      "Reference Number",
+    ];
+    const rows = selectedPayments.map((p) => [
+      p.id,
+      p.worker?.name || "",
+      p.pitak?.location || "",
+      p.grossPay,
+      p.netPay,
+      p.amountPaid || 0,
+      p.lastPaymentDate ? new Date(p.lastPaymentDate).toLocaleDateString() : "",
+      p.status,
+      p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : "",
+      p.referenceNumber || "",
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) => row.join(","))
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `payments_export_${new Date().toISOString().slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [payments, selectedIds]);
+
   return {
+    // Data
     payments,
     loading,
     page,
     totalPages,
     totalCount,
-    filters: { search, workerId, sessionId, status, startDate, endDate },
+    filters,
+    limit,
+    sortBy,
+    sortOrder,
+    totalGross: stats.totalGross,
+    totalNet: stats.totalNet,
+    totalDebtDeduction: stats.totalDebtDeduction,
+    statsLoading,
+    // Setters
     setPage,
-    setSearch,
-    setWorkerId,
-    setSessionId,
-    setStatus,
-    setStartDate,
-    setEndDate,
+    setLimit,
+    setSort,
+    setSearch: createSetter(setSearchRaw, debounceRefs.search, () => {}),
+    setWorkerId: createSetter(setWorkerIdRaw, debounceRefs.workerId, () => {}),
+    setSessionId: createSetter(
+      setSessionIdRaw,
+      debounceRefs.sessionId,
+      () => {},
+    ),
+    setStatus: createSetter(setStatusRaw, debounceRefs.status, () => {}),
+    setStartDate: createSetter(
+      setStartDateRaw,
+      debounceRefs.startDate,
+      () => {},
+    ),
+    setEndDate: createSetter(setEndDateRaw, debounceRefs.endDate, () => {}),
+    resetFilters,
+    // Modals
     selectedPayment,
     editingPayment,
+    statusChangePayment,
+    recordPayment,
+    workerOutstandingDebt,
     viewModal,
     formModal,
-    statusChangePayment,
     statusModal,
+    recordModal,
+    // Actions
     handleDelete,
     handleView,
     handleEdit,
     handleAddNew,
     handleFormSuccess,
-    handleChangeStatus,
+    handleChangeStatus: (payment: PaymentWithDetails) => {
+      setStatusChangePayment(payment);
+      statusModal.open();
+    },
     handleConfirmStatusChange,
-    resetFilters,
+    handleRecordPayment,
+    handleCancelPayment,
+    handleConfirmRecord,
+    refetch: refresh,
+
+    selectedIds,
+    setSelectedIds,
+    bulkDelete,
+    bulkStatusChange,
+    exportSelected,
   };
 };

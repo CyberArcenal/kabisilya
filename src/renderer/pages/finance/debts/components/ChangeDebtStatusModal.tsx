@@ -16,24 +16,24 @@ const getAvailableStatuses = (currentStatus: string): { value: string; label: st
     case 'pending':
       return [
         { value: 'partially_paid', label: 'Mark as Partially Paid', color: 'var(--warning-color)' },
-        { value: 'paid', label: 'Mark as Paid', color: 'var(--success-color)' },
+        // { value: 'paid', label: 'Mark as Paid', color: 'var(--success-color)' },
         { value: 'cancelled', label: 'Cancel Debt', color: 'var(--danger-color)' },
         { value: 'overdue', label: 'Mark as Overdue', color: 'var(--danger-color)' },
       ];
     case 'partially_paid':
       return [
-        { value: 'paid', label: 'Mark as Paid', color: 'var(--success-color)' },
+        // { value: 'paid', label: 'Mark as Paid', color: 'var(--success-color)' },
         { value: 'cancelled', label: 'Cancel Debt', color: 'var(--danger-color)' },
         { value: 'overdue', label: 'Mark as Overdue', color: 'var(--danger-color)' },
       ];
     case 'overdue':
       return [
         { value: 'partially_paid', label: 'Mark as Partially Paid', color: 'var(--warning-color)' },
-        { value: 'paid', label: 'Mark as Paid', color: 'var(--success-color)' },
+        // { value: 'paid', label: 'Mark as Paid', color: 'var(--success-color)' },
         { value: 'cancelled', label: 'Cancel Debt', color: 'var(--danger-color)' },
         { value: 'settled', label: 'Settle Debt', color: 'var(--accent-brown)' },
       ];
-    case 'paid':
+    // case 'paid':
     case 'cancelled':
     case 'settled':
       return [];

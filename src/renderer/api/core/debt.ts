@@ -16,7 +16,13 @@ export interface Debt {
   amount: number;
   reason?: string | null;
   balance: number;
-  status: "pending" | "partially_paid" | "paid" | "cancelled" | "overdue" | "settled";
+  status:
+    | "pending"
+    | "partially_paid"
+    | "paid"
+    | "cancelled"
+    | "overdue"
+    | "settled";
   dateIncurred: string;
   dueDate?: string | null;
   paymentTerm?: string | null;
@@ -41,7 +47,13 @@ export interface DebtCreateData {
   dueDate?: string;
   paymentTerm?: string;
   interestRate?: number;
-  status?: "pending" | "partially_paid" | "paid" | "cancelled" | "overdue" | "settled";
+  status?:
+    | "pending"
+    | "partially_paid"
+    | "paid"
+    | "cancelled"
+    | "overdue"
+    | "settled";
 }
 
 export interface DebtUpdateData extends Partial<DebtCreateData> {}
@@ -51,9 +63,10 @@ export type DebtsResponse = ApiResponse<PaginatedResponse<Debt>>;
 
 export interface DebtStats {
   totalDebts: number;
-  statusBreakdown: Record<string, number>;
   totalAmount: number;
   totalBalance: number;
+  overdueCount: number;
+  averageInterest?: number;
 }
 
 export type DebtStatsResponse = ApiResponse<DebtStats>;
@@ -75,7 +88,10 @@ export interface DebtFilters extends BaseFilters {
 class DebtAPI {
   private channel = "debt";
 
-  private async call<T = any>(method: string, params: Record<string, any> = {}): Promise<T> {
+  private async call<T = any>(
+    method: string,
+    params: Record<string, any> = {},
+  ): Promise<T> {
     if (!window.backendAPI?.debt) {
       throw new Error(`Electron API (${this.channel}) not available`);
     }
@@ -120,21 +136,24 @@ class DebtAPI {
 
   async getByWorker(
     workerId: number,
-    params?: Omit<DebtFilters, "workerId">
+    params?: Omit<DebtFilters, "workerId">,
   ): Promise<DebtsResponse> {
     return this.getAll({ ...params, workerId });
   }
 
   async getBySession(
     sessionId: number,
-    params?: Omit<DebtFilters, "sessionId">
+    params?: Omit<DebtFilters, "sessionId">,
   ): Promise<DebtsResponse> {
     return this.getAll({ ...params, sessionId });
   }
 
-  async getStats(sessionId?: number): Promise<DebtStatsResponse> {
+  async getStats(filters?: DebtFilters): Promise<DebtStatsResponse> {
     try {
-      const response = await this.call<DebtStatsResponse>("getDebtStats", { sessionId });
+      const response = await this.call<DebtStatsResponse>(
+        "getDebtStats",
+        filters || {},
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
     } catch (error: any) {
@@ -157,7 +176,10 @@ class DebtAPI {
   async update(id: number, data: DebtUpdateData): Promise<DebtResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<DebtResponse>("updateDebt", { id, ...data });
+      const response = await this.call<DebtResponse>("updateDebt", {
+        id,
+        ...data,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update debt");
     } catch (error: any) {
@@ -168,7 +190,10 @@ class DebtAPI {
   async updateStatus(id: number, status: string): Promise<DebtResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<DebtResponse>("updateStatus", { id, status });
+      const response = await this.call<DebtResponse>("updateStatus", {
+        id,
+        status,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update debt status");
     } catch (error: any) {
@@ -198,18 +223,29 @@ class DebtAPI {
     }
   }
 
-  async payDebt(id: number, amount: number, notes?: string): Promise<DebtResponse> {
-  try {
-    if (!id || id <= 0) throw new Error("Invalid ID");
-    if (!amount || amount <= 0) throw new Error("Invalid payment amount");
-    const response = await this.call<DebtResponse>("payDebt", { id, amount, notes });
-    if (response.status) return response;
-    throw new Error(response.message || "Failed to record payment");
-  } catch (error: any) {
-    throw new Error(error.message || "Failed to record payment");
+  async payDebt(
+    id: number,
+    amount: number,
+    paymentMethod?: string,
+    referenceNumber?: string,
+    notes?: string,
+  ): Promise<DebtResponse> {
+    try {
+      if (!id || id <= 0) throw new Error("Invalid ID");
+      if (!amount || amount <= 0) throw new Error("Invalid payment amount");
+      const response = await this.call<DebtResponse>("payDebt", {
+        id,
+        amount,
+        paymentMethod,
+        referenceNumber,
+        notes,
+      });
+      if (response.status) return response;
+      throw new Error(response.message || "Failed to record payment");
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to record payment");
+    }
   }
-}
-
 }
 
 const debtAPI = new DebtAPI();

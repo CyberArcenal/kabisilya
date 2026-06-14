@@ -6,7 +6,6 @@ import { dialogs } from "../../../../utils/dialogs";
 import type { DebtWithDetails, DebtFormData } from "../types";
 import debtAPI from "../../../../api/core/debt";
 
-const PAGE_SIZE = 10;
 const DEBOUNCE_MS = 300;
 
 export const useDebts = () => {
@@ -20,6 +19,18 @@ export const useDebts = () => {
   });
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Pagination & Sorting
+  const [limit, setLimitState] = useState(() => {
+    const l = searchParams.get("limit");
+    return l ? parseInt(l, 10) : 10;
+  });
+  const [sortBy, setSortBy] = useState(
+    () => searchParams.get("sortBy") || "dueDate",
+  );
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">(
+    () => (searchParams.get("sortOrder") as "ASC" | "DESC") || "ASC",
+  );
 
   // Filters
   const [search, setSearchState] = useState(
@@ -47,21 +58,21 @@ export const useDebts = () => {
     return val ? parseFloat(val) : undefined;
   });
 
-  // Selected debt for modals
+  // Modal states
   const [selectedDebt, setSelectedDebt] = useState<DebtWithDetails | null>(
     null,
   );
-  const [editingDebt, setEditingDebt] = useState<
-    (DebtFormData & { id: number }) | null
-  >(null);
-  const [statusChangeDebt, setStatusChangeDebt] =
-    useState<DebtWithDetails | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [paymentDebt, setPaymentDebt] = useState<DebtWithDetails | null>(null);
+  const [stats, setStats] = useState({
+    totalDebts: 0,
+    totalBalance: 0,
+    overdueCount: 0,
+    averageInterest: 0,
+  });
 
-  // Modals
   const viewModal = useModal();
   const formModal = useModal();
-  const statusModal = useModal();
   const paymentModal = useModal();
 
   // Refs
@@ -77,6 +88,7 @@ export const useDebts = () => {
     maxAmount: useRef<NodeJS.Timeout>(),
   };
 
+  // URL update helper
   const updateUrl = useCallback(
     (
       newPage: number,
@@ -87,6 +99,9 @@ export const useDebts = () => {
       newDueDateEnd: string,
       newMinAmount: number | undefined,
       newMaxAmount: number | undefined,
+      newLimit: number,
+      newSortBy: string,
+      newSortOrder: "ASC" | "DESC",
     ) => {
       const params: Record<string, string> = {};
       if (newSearch) params.search = newSearch;
@@ -99,6 +114,9 @@ export const useDebts = () => {
       if (newMaxAmount !== undefined)
         params.maxAmount = newMaxAmount.toString();
       if (newPage > 1) params.page = newPage.toString();
+      if (newLimit !== 10) params.limit = newLimit.toString();
+      if (newSortBy !== "dueDate") params.sortBy = newSortBy;
+      if (newSortOrder !== "ASC") params.sortOrder = newSortOrder;
       setSearchParams(params, { replace: true });
     },
     [setSearchParams],
@@ -114,6 +132,10 @@ export const useDebts = () => {
     const urlDueDateEnd = searchParams.get("dueDateEnd") || "";
     const urlMinAmount = searchParams.get("minAmount");
     const urlMaxAmount = searchParams.get("maxAmount");
+    const urlLimit = searchParams.get("limit");
+    const urlSortBy = searchParams.get("sortBy") || "dueDate";
+    const urlSortOrder =
+      (searchParams.get("sortOrder") as "ASC" | "DESC") || "ASC";
 
     let needsUpdate = false;
     const newPage = urlPage ? parseInt(urlPage, 10) : 1;
@@ -152,9 +174,22 @@ export const useDebts = () => {
       setMaxAmountState(newMaxAmount);
       needsUpdate = true;
     }
+    const newLimit = urlLimit ? parseInt(urlLimit, 10) : 10;
+    if (newLimit !== limit) {
+      setLimitState(newLimit);
+      needsUpdate = true;
+    }
+    if (urlSortBy !== sortBy) {
+      setSortBy(urlSortBy);
+      needsUpdate = true;
+    }
+    if (urlSortOrder !== sortOrder) {
+      setSortOrder(urlSortOrder);
+      needsUpdate = true;
+    }
   }, [searchParams]);
 
-  // Setters with URL update
+  // Setters
   const setPage = (newPage: number) => {
     if (newPage === page) return;
     setPageState(newPage);
@@ -167,9 +202,51 @@ export const useDebts = () => {
       dueDateEnd,
       minAmount,
       maxAmount,
+      limit,
+      sortBy,
+      sortOrder,
     );
   };
-
+  const setLimit = (newLimit: number) => {
+    setLimitState(newLimit);
+    setPageState(1);
+    updateUrl(
+      1,
+      search,
+      workerId,
+      status,
+      dueDateStart,
+      dueDateEnd,
+      minAmount,
+      maxAmount,
+      newLimit,
+      sortBy,
+      sortOrder,
+    );
+  };
+  const setSort = (field: string) => {
+    let newSortBy = field;
+    let newSortOrder: "ASC" | "DESC" = "ASC";
+    if (sortBy === field) {
+      newSortOrder = sortOrder === "ASC" ? "DESC" : "ASC";
+    }
+    setSortBy(newSortBy);
+    setSortOrder(newSortOrder);
+    setPageState(1);
+    updateUrl(
+      1,
+      search,
+      workerId,
+      status,
+      dueDateStart,
+      dueDateEnd,
+      minAmount,
+      maxAmount,
+      limit,
+      newSortBy,
+      newSortOrder,
+    );
+  };
   const setSearch = (val: string) => {
     setSearchState(val);
     if (debounceRefs.search.current) clearTimeout(debounceRefs.search.current);
@@ -183,11 +260,13 @@ export const useDebts = () => {
         dueDateEnd,
         minAmount,
         maxAmount,
+        limit,
+        sortBy,
+        sortOrder,
       );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setWorkerId = (val: number | undefined) => {
     setWorkerIdState(val);
     if (debounceRefs.workerId.current)
@@ -202,11 +281,13 @@ export const useDebts = () => {
         dueDateEnd,
         minAmount,
         maxAmount,
+        limit,
+        sortBy,
+        sortOrder,
       );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setStatus = (val: string) => {
     setStatusState(val);
     if (debounceRefs.status.current) clearTimeout(debounceRefs.status.current);
@@ -220,11 +301,13 @@ export const useDebts = () => {
         dueDateEnd,
         minAmount,
         maxAmount,
+        limit,
+        sortBy,
+        sortOrder,
       );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setDueDateStart = (val: string) => {
     setDueDateStartState(val);
     if (debounceRefs.dueDateStart.current)
@@ -239,11 +322,13 @@ export const useDebts = () => {
         dueDateEnd,
         minAmount,
         maxAmount,
+        limit,
+        sortBy,
+        sortOrder,
       );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setDueDateEnd = (val: string) => {
     setDueDateEndState(val);
     if (debounceRefs.dueDateEnd.current)
@@ -258,11 +343,13 @@ export const useDebts = () => {
         val,
         minAmount,
         maxAmount,
+        limit,
+        sortBy,
+        sortOrder,
       );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setMinAmount = (val: number | undefined) => {
     setMinAmountState(val);
     if (debounceRefs.minAmount.current)
@@ -277,11 +364,13 @@ export const useDebts = () => {
         dueDateEnd,
         val,
         maxAmount,
+        limit,
+        sortBy,
+        sortOrder,
       );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const setMaxAmount = (val: number | undefined) => {
     setMaxAmountState(val);
     if (debounceRefs.maxAmount.current)
@@ -296,11 +385,13 @@ export const useDebts = () => {
         dueDateEnd,
         minAmount,
         val,
+        limit,
+        sortBy,
+        sortOrder,
       );
       setPageState(1);
     }, DEBOUNCE_MS);
   };
-
   const resetFilters = () => {
     setSearchState("");
     setWorkerIdState(undefined);
@@ -310,9 +401,22 @@ export const useDebts = () => {
     setMinAmountState(undefined);
     setMaxAmountState(undefined);
     setPageState(1);
-    updateUrl(1, "", undefined, "", "", "", undefined, undefined);
+    updateUrl(
+      1,
+      "",
+      undefined,
+      "",
+      "",
+      "",
+      undefined,
+      undefined,
+      limit,
+      sortBy,
+      sortOrder,
+    );
   };
 
+  // Cleanup
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -324,6 +428,7 @@ export const useDebts = () => {
     };
   }, []);
 
+  // Fetch debts
   const fetchDebts = useCallback(async () => {
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -331,12 +436,7 @@ export const useDebts = () => {
     if (!isMountedRef.current) return;
     setLoading(true);
     try {
-      const params: any = {
-        page,
-        limit: PAGE_SIZE,
-        sortBy: "dueDate",
-        sortOrder: "ASC",
-      };
+      const params: any = { page, limit, sortBy, sortOrder };
       if (search) params.search = search;
       if (workerId) params.workerId = workerId;
       if (status) params.status = status;
@@ -359,6 +459,9 @@ export const useDebts = () => {
     }
   }, [
     page,
+    limit,
+    sortBy,
+    sortOrder,
     search,
     workerId,
     status,
@@ -372,7 +475,45 @@ export const useDebts = () => {
     fetchDebts();
   }, [fetchDebts]);
 
-  // CRUD handlers
+  // Stats
+  const fetchStats = useCallback(async () => {
+    try {
+      const params: any = {
+        workerId,
+        status,
+        dueDateStart,
+        dueDateEnd,
+        minAmount,
+        maxAmount,
+        search,
+      };
+      const res = await debtAPI.getStats(params);
+      if (res.status && res.data) {
+        setStats({
+          totalDebts: res.data.totalDebts,
+          totalBalance: res.data.totalBalance,
+          overdueCount: res.data.overdueCount,
+          averageInterest: res.data.averageInterest || 0,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch debt stats", error);
+    }
+  }, [
+    workerId,
+    status,
+    dueDateStart,
+    dueDateEnd,
+    minAmount,
+    maxAmount,
+    search,
+  ]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // Handlers
   const handleDelete = async (id: number) => {
     const confirmed = await dialogs.confirm({
       title: "Delete Debt",
@@ -388,47 +529,35 @@ export const useDebts = () => {
     }
   };
 
+  const handleCancelDebt = async (debt: DebtWithDetails) => {
+  const confirmed = await dialogs.confirm({
+    title: "Cancel Debt",
+    message: `Are you sure you want to cancel this debt? This action cannot be undone.`,
+    confirmText: "Cancel Debt",
+    icon: "danger",
+  });
+  if (!confirmed) return;
+  try {
+    await debtAPI.updateStatus(debt.id, "cancelled");
+    await fetchDebts();
+  } catch (error) {
+    console.error("Failed to cancel debt", error);
+    dialogs.error("Failed to cancel debt");
+  }
+};
+
   const handleView = (debt: DebtWithDetails) => {
     setSelectedDebt(debt);
     viewModal.open();
   };
-const handleEdit = (debt: DebtWithDetails) => {
-  console.log("handleEdit called with debt:", debt);
-  if (!debt) return;
-  setEditingDebt({
-    id: debt.id,
-    workerId: debt.worker?.id || 0,
-    sessionId: debt.session?.id || 0,
-    amount: debt.amount,
-    dueDate: debt.dueDate ? new Date(debt.dueDate).toISOString().split("T")[0] : "",
-    interestRate: debt.interestRate || 0,
-    reason: debt.reason || "",
-    status: debt.status,
-  });
-  formModal.open();
-};
 
   const handleAddNew = () => {
-    setEditingDebt(null);
     formModal.open();
   };
 
   const handleFormSuccess = () => {
     formModal.close();
-    setEditingDebt(null);
     fetchDebts();
-  };
-
-  const handleChangeStatus = (debt: DebtWithDetails) => {
-    setStatusChangeDebt(debt);
-    statusModal.open();
-  };
-
-  const handleConfirmStatusChange = async (newStatus: string) => {
-    if (!statusChangeDebt) return;
-    await debtAPI.updateStatus(statusChangeDebt.id, newStatus);
-    await fetchDebts();
-    setStatusChangeDebt(null);
   };
 
   const handleRecordPayment = (debt: DebtWithDetails) => {
@@ -439,11 +568,137 @@ const handleEdit = (debt: DebtWithDetails) => {
   const handleConfirmPayment = async (
     debtId: number,
     amount: number,
+    paymentMethod: string,
+    referenceNumber?: string,
     notes?: string,
   ) => {
-    await debtAPI.payDebt(debtId, amount, notes);
+    await debtAPI.payDebt(
+      debtId,
+      amount,
+      paymentMethod,
+      referenceNumber,
+      notes,
+    );
     await fetchDebts();
     setPaymentDebt(null);
+  };
+
+  // Bulk actions
+  const bulkDelete = async (ids: number[]) => {
+    const confirmed = await dialogs.confirm({
+      title: "Bulk Delete",
+      message: `Are you sure you want to delete ${ids.length} debt(s)? This action cannot be undone.`,
+      confirmText: "Delete",
+      icon: "danger",
+    });
+    if (!confirmed) return;
+    try {
+      await Promise.all(ids.map((id) => debtAPI.delete(id)));
+      await fetchDebts();
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("Bulk delete failed", error);
+    }
+  };
+
+  const bulkStatusChange = async (ids: number[], newStatus: string) => {
+    const confirmed = await dialogs.confirm({
+      title: "Bulk Status Change",
+      message: `Change ${ids.length} debt(s) to "${newStatus}"?`,
+      confirmText: "Change",
+    });
+    if (!confirmed) return;
+    try {
+      await Promise.all(ids.map((id) => debtAPI.updateStatus(id, newStatus)));
+      await fetchDebts();
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("Bulk status change failed", error);
+    }
+  };
+
+  const bulkExport = () => {
+    const selectedDebts = debts.filter((d) => selectedIds.includes(d.id));
+    if (selectedDebts.length === 0) return;
+    const headers = [
+      "ID",
+      "Worker",
+      "Amount",
+      "Balance",
+      "Due Date",
+      "Status",
+      "Interest Rate",
+      "Reason",
+    ];
+    const rows = selectedDebts.map((d) => [
+      d.id,
+      d.worker?.name || "",
+      d.amount,
+      d.balance,
+      d.dueDate ? new Date(d.dueDate).toLocaleDateString() : "",
+      d.status,
+      d.interestRate,
+      d.reason || "",
+    ]);
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `selected_debts_${new Date().toISOString().slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToCSV = async () => {
+    const params: any = {
+      limit: 10000,
+      search,
+      workerId,
+      status,
+      dueDateStart,
+      dueDateEnd,
+      minAmount,
+      maxAmount,
+      sortBy,
+      sortOrder,
+    };
+    const res = await debtAPI.getAll(params);
+    if (res.status) {
+      const items = res.data.items;
+      const headers = [
+        "ID",
+        "Worker",
+        "Amount",
+        "Balance",
+        "Due Date",
+        "Status",
+        "Interest Rate",
+        "Reason",
+      ];
+      const rows = items.map((d) => [
+        d.id,
+        d.worker?.name || "",
+        d.amount,
+        d.balance,
+        d.dueDate ? new Date(d.dueDate).toLocaleDateString() : "",
+        d.status,
+        d.interestRate,
+        d.reason || "",
+      ]);
+      const csvContent = [headers, ...rows]
+        .map((row) => row.join(","))
+        .join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `debts_export_${new Date().toISOString().slice(0, 19)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      dialogs.error("Failed to export debts");
+    }
   };
 
   return {
@@ -452,6 +707,7 @@ const handleEdit = (debt: DebtWithDetails) => {
     page,
     totalPages,
     totalCount,
+    statsTotal: stats.totalDebts,
     filters: {
       search,
       workerId,
@@ -461,7 +717,25 @@ const handleEdit = (debt: DebtWithDetails) => {
       minAmount,
       maxAmount,
     },
+    totalBalance: stats.totalBalance,
+    overdueCount: stats.overdueCount,
+    averageInterest: stats.averageInterest,
+    limit,
+    sortBy,
+    sortOrder,
+    selectedDebt,
+    viewModal,
+    formModal,
+    paymentDebt,
+    paymentModal,
+    selectedIds,
+    setSelectedIds,
+    bulkDelete,
+    bulkStatusChange,
+    bulkExport,
     setPage,
+    setLimit,
+    setSort,
     setSearch,
     setWorkerId,
     setStatus,
@@ -469,23 +743,15 @@ const handleEdit = (debt: DebtWithDetails) => {
     setDueDateEnd,
     setMinAmount,
     setMaxAmount,
-    selectedDebt,
-    editingDebt,
-    viewModal,
-    formModal,
-    statusChangeDebt,
-    statusModal,
-    paymentDebt,
-    paymentModal,
     handleDelete,
     handleView,
-    handleEdit,
     handleAddNew,
     handleFormSuccess,
-    handleChangeStatus,
-    handleConfirmStatusChange,
     handleRecordPayment,
     handleConfirmPayment,
+    handleCancelDebt,
     resetFilters,
+    refetch: fetchDebts,
+    exportToCSV,
   };
 };
