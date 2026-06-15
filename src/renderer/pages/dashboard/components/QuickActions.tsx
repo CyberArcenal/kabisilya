@@ -10,14 +10,14 @@ const QuickActions: React.FC = () => {
     <div className="flex gap-3">
       <button
         onClick={() => navigate("/farms/assignments")}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white hover:bg-[var(--primary-hover)] transition-colors"
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[var(--primary-color)] to-[var(--primary-hover)] text-white font-medium shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
       >
         <PlusCircle className="w-4 h-4" />
         New Assignment
       </button>
       <button
         onClick={() => navigate("/finance/payments")}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--text-primary)] hover:bg-[var(--card-hover-bg)] transition-colors"
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--text-primary)] font-medium hover:bg-[var(--card-hover-bg)] transition-all hover:-translate-y-0.5"
       >
         <CreditCard className="w-4 h-4" />
         Record Payment

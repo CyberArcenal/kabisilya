@@ -11,6 +11,14 @@ interface SessionTableProps {
   onDelete: (id: number) => void;
   onSetActive: (id: number) => void;
   onChangeStatus: (session: SessionWithDetails) => void;
+  // Sorting
+  onSort?: (field: string) => void;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC";
+  // Selection
+  selectedIds?: number[];
+  onSelectRow?: (id: number, checked: boolean) => void;
+  onSelectAll?: (checked: boolean) => void;
 }
 
 const statusIcon: Record<string, React.ReactNode> = {
@@ -26,28 +34,84 @@ const SessionTable: React.FC<SessionTableProps> = ({
   onDelete,
   onSetActive,
   onChangeStatus,
+  onSort,
+  sortBy,
+  sortOrder,
+  selectedIds = [],
+  onSelectRow,
+  onSelectAll,
 }) => {
   if (sessions.length === 0) {
-    return <div className="text-center py-8 text-[var(--text-tertiary)]">No sessions found</div>;
+    return <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">No sessions found</div>;
   }
+
+  const allSelected = sessions.length > 0 && sessions.every(s => selectedIds.includes(s.id));
+  const someSelected = selectedIds.length > 0 && !allSelected;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)]">
       <table className="w-full text-sm">
         <thead className="bg-[var(--card-secondary-bg)] border-b border-[var(--border-color)]">
           <tr>
-            <th className="text-left py-3 px-4">Name</th>
-            <th className="text-left py-3 px-4">Year</th>
-            <th className="text-left py-3 px-4">Season Type</th>
-            <th className="text-left py-3 px-4">Start Date</th>
-            <th className="text-left py-3 px-4">End Date</th>
-            <th className="text-left py-3 px-4">Status</th>
-            <th className="text-left py-3 px-4">Actions</th>
+            <th className="py-3 px-4 w-8">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(input) => { if (input) input.indeterminate = someSelected; }}
+                onChange={(e) => onSelectAll?.(e.target.checked)}
+                className="rounded border-[var(--border-color)] cursor-pointer"
+              />
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("name")}
+            >
+              Name {sortBy === "name" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("year")}
+            >
+              Year {sortBy === "year" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("seasonType")}
+            >
+              Season Type {sortBy === "seasonType" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("startDate")}
+            >
+              Start Date {sortBy === "startDate" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("endDate")}
+            >
+              End Date {sortBy === "endDate" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
+            <th
+              className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("status")}
+            >
+              Status {sortBy === "status" && (sortOrder === "ASC" ? "↑" : "↓")}
+            </th>
+            <th className="text-left py-3 px-4 font-semibold text-[var(--text-secondary)]">Actions</th>
           </tr>
         </thead>
         <tbody>
           {sessions.map((session) => (
             <tr key={session.id} className="border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors">
+              <td className="py-2.5 px-4">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(session.id)}
+                  onChange={(e) => onSelectRow?.(session.id, e.target.checked)}
+                  className="rounded border-[var(--border-color)] cursor-pointer"
+                />
+              </td>
               <td className="py-2.5 px-4 font-medium">
                 <div className="flex items-center gap-2">
                   {session.name}

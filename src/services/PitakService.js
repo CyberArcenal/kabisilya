@@ -89,9 +89,14 @@ class PitakService {
 
       const bukid = await bukidRepo.findOne({
         where: { id: data.bukidId, deletedAt: null },
+        relations: ["session"],
       });
       if (!bukid) throw new Error(`Bukid with ID ${data.bukidId} not found`);
-
+      if (bukid.session.status !== "active") {
+        throw new Error(
+          `Cannot create pitak because the farm's session (${bukid.session.name}) is not active. Only active sessions allow creation.`,
+        );
+      }
       // Auto-generate location if not provided
       let location = data.location;
       if (!location || location.trim() === "") {
@@ -151,10 +156,14 @@ class PitakService {
     try {
       const existing = await pitakRepo.findOne({
         where: { id, deletedAt: null },
-        relations: ["bukid"],
+        relations: ["bukid", "bukid.session"],
       });
       if (!existing) throw new Error(`Pitak with ID ${id} not found`);
-
+      if (existing.bukid.session.status !== "active") {
+        throw new Error(
+          `Cannot update pitak "${existing.location}" because its farm's session (${existing.bukid.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       const oldData = { ...existing };
 
       if (data.bukidId !== undefined) {
@@ -213,7 +222,10 @@ class PitakService {
     const Pitak = require("../entities/Pitak");
     const pitakRepo = this._getRepo(qr, Pitak);
 
-    const pitak = await pitakRepo.findOne({ where: { id, deletedAt: null } });
+    const pitak = await pitakRepo.findOne({
+      where: { id, deletedAt: null },
+      relations: ["bukid", "bukid.session"],
+    });
     if (!pitak) throw new Error(`Pitak with ID ${id} not found`);
 
     const oldStatus = pitak.status;
@@ -230,7 +242,11 @@ class PitakService {
         `Invalid status transition from ${oldStatus} to ${newStatus}`,
       );
     }
-
+    if (pitak.bukid.session.status !== "active") {
+      throw new Error(
+        `Cannot change status of pitak "${pitak.location}" because its farm's session (${pitak.bukid.session.name}) is not active. Only active sessions allow modifications.`,
+      );
+    }
     pitak.status = newStatus;
     pitak.updatedAt = new Date();
 
@@ -257,10 +273,17 @@ class PitakService {
     const pitakRepo = this._getRepo(qr, Pitak);
 
     try {
-      const pitak = await pitakRepo.findOne({ where: { id, deletedAt: null } });
+      const pitak = await pitakRepo.findOne({
+        where: { id, deletedAt: null },
+        relations: ["bukid", "bukid.session"],
+      });
       if (!pitak) throw new Error(`Pitak with ID ${id} not found`);
       if (pitak.deletedAt) throw new Error(`Pitak #${id} is already deleted`);
-
+      if (pitak.bukid.session.status !== "active") {
+        throw new Error(
+          `Cannot delete pitak "${pitak.location}" because its farm's session (${pitak.bukid.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       const oldData = { ...pitak };
       pitak.deletedAt = new Date();
       pitak.updatedAt = new Date();
@@ -290,10 +313,15 @@ class PitakService {
       const pitak = await pitakRepo.findOne({
         where: { id },
         withDeleted: true,
+        relations: ["bukid", "bukid.session"],
       });
       if (!pitak) throw new Error(`Pitak with ID ${id} not found`);
       if (!pitak.deletedAt) throw new Error(`Pitak #${id} is not deleted`);
-
+      if (pitak.bukid.session.status !== "active") {
+        throw new Error(
+          `Cannot delete restore "${pitak.location}" because its farm's session (${pitak.bukid.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       pitak.deletedAt = null;
       pitak.updatedAt = new Date();
 
@@ -324,9 +352,17 @@ class PitakService {
     const Pitak = require("../entities/Pitak");
     const pitakRepo = this._getRepo(qr, Pitak);
 
-    const pitak = await pitakRepo.findOne({ where: { id }, withDeleted: true });
+    const pitak = await pitakRepo.findOne({
+      where: { id },
+      withDeleted: true,
+      relations: ["bukid", "bukid.session"],
+    });
     if (!pitak) throw new Error(`Pitak with ID ${id} not found`);
-
+    if (pitak.bukid.session.status !== "active") {
+      throw new Error(
+        `Cannot delete pitak "${pitak.location}" because its farm's session (${pitak.bukid.session.name}) is not active. Only active sessions allow modifications.`,
+      );
+    }
     await removeDb(pitakRepo, pitak);
     await auditLogger.logDelete("Pitak", id, pitak, user);
     console.log(`Pitak #${id} permanently deleted`);

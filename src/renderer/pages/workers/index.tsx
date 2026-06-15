@@ -84,7 +84,7 @@ const WorkersPage: React.FC = () => {
           <button onClick={refetch} disabled={loading} className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] disabled:opacity-50" title="Refresh">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <Button variant="primary" size="md" icon={Plus} onClick={handleAddNew}>Add Worker</Button>
+          <Button variant="primary" size="sm" icon={Plus} onClick={handleAddNew}>Add Worker</Button>
         </div>
       </div>
 

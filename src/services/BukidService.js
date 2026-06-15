@@ -41,9 +41,12 @@ class BukidService {
    * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
-    const qrType = qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
     const hasManager = qr && typeof qr === "object" && !!qr.manager;
-    console.log(`[Bukid._getRepo] qr type: ${qrType}, has manager: ${hasManager}`);
+    console.log(
+      `[Bukid._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
 
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
@@ -71,9 +74,17 @@ class BukidService {
       if (!data.name) throw new Error("Bukid name is required");
       if (!data.sessionId) throw new Error("sessionId is required");
 
-      const session = await sessionRepo.findOne({ where: { id: data.sessionId } });
-      if (!session) throw new Error(`Session with ID ${data.sessionId} not found`);
-
+      const session = await sessionRepo.findOne({
+        where: { id: data.sessionId },
+      });
+      if (!session)
+        throw new Error(`Session with ID ${data.sessionId} not found`);
+      
+      if (session.status !== "active") {
+        throw new Error(
+          `Cannot create bukid because session "${session.name}" is not active. Only active sessions allow creation.`,
+        );
+      }
       const bukidData = {
         name: data.name,
         location: data.location || null,
@@ -121,10 +132,19 @@ class BukidService {
 
       // Handle sessionId update separately
       if (data.sessionId !== undefined) {
-        const session = await sessionRepo.findOne({ where: { id: data.sessionId } });
-        if (!session) throw new Error(`Session with ID ${data.sessionId} not found`);
+        const session = await sessionRepo.findOne({
+          where: { id: data.sessionId },
+        });
+        if (!session)
+          throw new Error(`Session with ID ${data.sessionId} not found`);
         existing.session = session;
         delete data.sessionId;
+      }
+
+      if (existing.session.status !== "active") {
+        throw new Error(
+          `Cannot update bukid "${existing.name}" because its session (${existing.session.name}) is not active. Only active sessions allow modifications.`,
+        );
       }
 
       // Apply other updates (skip status if you want to use updateStatus separately)
@@ -152,7 +172,10 @@ class BukidService {
     const Bukid = require("../entities/Bukid");
     const bukidRepo = this._getRepo(qr, Bukid);
 
-    const bukid = await bukidRepo.findOne({ where: { id, deletedAt: null } });
+    const bukid = await bukidRepo.findOne({
+      where: { id, deletedAt: null },
+      relations: ["session"],
+    });
     if (!bukid) throw new Error(`Bukid with ID ${id} not found`);
 
     const oldStatus = bukid.status;
@@ -167,14 +190,28 @@ class BukidService {
     };
 
     if (!allowedTransitions[oldStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${oldStatus} to ${newStatus}`);
+      throw new Error(
+        `Invalid status transition from ${oldStatus} to ${newStatus}`,
+      );
+    }
+
+    if (bukid.session.status !== "active") {
+      throw new Error(
+        `Cannot change status of bukid "${bukid.name}" because its session (${bukid.session.name}) is not active. Only active sessions allow modifications.`,
+      );
     }
 
     bukid.status = newStatus;
     bukid.updatedAt = new Date();
 
     const saved = await updateDb(bukidRepo, bukid, { queryRunner: qr });
-    await auditLogger.logUpdate("Bukid", id, { status: oldStatus }, { status: newStatus }, user);
+    await auditLogger.logUpdate(
+      "Bukid",
+      id,
+      { status: oldStatus },
+      { status: newStatus },
+      user,
+    );
     return saved;
   }
 
@@ -190,10 +227,17 @@ class BukidService {
     const bukidRepo = this._getRepo(qr, Bukid);
 
     try {
-      const bukid = await bukidRepo.findOne({ where: { id, deletedAt: null } });
+      const bukid = await bukidRepo.findOne({
+        where: { id, deletedAt: null },
+        relations: ["session"],
+      });
       if (!bukid) throw new Error(`Bukid with ID ${id} not found`);
       if (bukid.deletedAt) throw new Error(`Bukid #${id} is already deleted`);
-
+      if (bukid.session.status !== "active") {
+        throw new Error(
+          `Cannot delete bukid "${bukid.name}" because its session (${bukid.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       const oldData = { ...bukid };
       bukid.deletedAt = new Date();
       bukid.updatedAt = new Date();
@@ -220,15 +264,29 @@ class BukidService {
     const bukidRepo = this._getRepo(qr, Bukid);
 
     try {
-      const bukid = await bukidRepo.findOne({ where: { id }, withDeleted: true });
+      const bukid = await bukidRepo.findOne({
+        where: { id },
+        withDeleted: true,
+        relations: ["session"],
+      });
       if (!bukid) throw new Error(`Bukid with ID ${id} not found`);
       if (!bukid.deletedAt) throw new Error(`Bukid #${id} is not deleted`);
-
+      if (bukid.session.status !== "active") {
+        throw new Error(
+          `Cannot restore bukid "${bukid.name}" because its session (${bukid.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       bukid.deletedAt = null;
       bukid.updatedAt = new Date();
 
       const saved = await updateDb(bukidRepo, bukid, { queryRunner: qr });
-      await auditLogger.logUpdate("Bukid", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "Bukid",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Bukid restored: #${id}`);
       return saved;
     } catch (error) {
@@ -248,8 +306,18 @@ class BukidService {
     const Bukid = require("../entities/Bukid");
     const bukidRepo = this._getRepo(qr, Bukid);
 
-    const bukid = await bukidRepo.findOne({ where: { id }, withDeleted: true });
+    const bukid = await bukidRepo.findOne({
+      where: { id },
+      withDeleted: true,
+      relations: ["session"],
+    });
     if (!bukid) throw new Error(`Bukid with ID ${id} not found`);
+
+    if (bukid.session.status !== "active") {
+      throw new Error(
+        `Cannot delete bukid "${bukid.name}" because its session (${bukid.session.name}) is not active. Only active sessions allow modifications.`,
+      );
+    }
 
     await removeDb(bukidRepo, bukid);
     await auditLogger.logDelete("Bukid", id, bukid, user);
@@ -312,7 +380,15 @@ class BukidService {
       sessionId = await farmSessionDefaultSessionId();
       if (!sessionId) {
         console.warn("No default session ID available for Bukid.findAll");
-        return { data: [], pagination: { page: options.page || 1, limit: options.limit || 10, total: 0, pages: 0 } };
+        return {
+          data: [],
+          pagination: {
+            page: options.page || 1,
+            limit: options.limit || 10,
+            total: 0,
+            pages: 0,
+          },
+        };
       }
     }
 
@@ -324,22 +400,28 @@ class BukidService {
       qb.andWhere("bukid.status = :status", { status: options.status });
     }
     if (options.search) {
-      qb.andWhere("(bukid.name LIKE :search OR bukid.location LIKE :search OR bukid.description LIKE :search)", {
-        search: `%${options.search}%`,
-      });
+      qb.andWhere(
+        "(bukid.name LIKE :search OR bukid.location LIKE :search OR bukid.description LIKE :search)",
+        {
+          search: `%${options.search}%`,
+        },
+      );
     }
 
     // Sorting
-  const sortMap = {
-    name: "bukid.name",
-    status: "bukid.status",
-    area: "bukid.area",
-    createdAt: "bukid.createdAt",
-    "session.name": "session.name",
-  };
-  let sortBy = options.sortBy && sortMap[options.sortBy] ? sortMap[options.sortBy] : "bukid.createdAt";
-  let sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
-  qb.orderBy(sortBy, sortOrder);
+    const sortMap = {
+      name: "bukid.name",
+      status: "bukid.status",
+      area: "bukid.area",
+      createdAt: "bukid.createdAt",
+      "session.name": "session.name",
+    };
+    let sortBy =
+      options.sortBy && sortMap[options.sortBy]
+        ? sortMap[options.sortBy]
+        : "bukid.createdAt";
+    let sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
+    qb.orderBy(sortBy, sortOrder);
 
     // Pagination using utility
     const result = await paginateQueryBuilder(qb, {
@@ -356,16 +438,33 @@ class BukidService {
    */
   async getStatistics() {
     const { bukid: repo } = await this.getRepositories();
-    const qb = repo.createQueryBuilder("bukid").where("bukid.deletedAt IS NULL");
+    const qb = repo
+      .createQueryBuilder("bukid")
+      .where("bukid.deletedAt IS NULL");
 
     const total = await qb.getCount();
-    const active = await qb.clone().andWhere("bukid.status = :status", { status: "active" }).getCount();
-    const completed = await qb.clone().andWhere("bukid.status = :status", { status: "completed" }).getCount();
-    const cancelled = await qb.clone().andWhere("bukid.status = :status", { status: "cancelled" }).getCount();
-    const initiated = await qb.clone().andWhere("bukid.status = :status", { status: "initiated" }).getCount();
+    const active = await qb
+      .clone()
+      .andWhere("bukid.status = :status", { status: "active" })
+      .getCount();
+    const completed = await qb
+      .clone()
+      .andWhere("bukid.status = :status", { status: "completed" })
+      .getCount();
+    const cancelled = await qb
+      .clone()
+      .andWhere("bukid.status = :status", { status: "cancelled" })
+      .getCount();
+    const initiated = await qb
+      .clone()
+      .andWhere("bukid.status = :status", { status: "initiated" })
+      .getCount();
 
     // Sum of area (if numeric)
-    const totalAreaResult = await qb.clone().select("SUM(bukid.area)", "sum").getRawOne();
+    const totalAreaResult = await qb
+      .clone()
+      .select("SUM(bukid.area)", "sum")
+      .getRawOne();
     const totalArea = parseFloat(totalAreaResult.sum) || 0;
 
     return {
@@ -379,56 +478,59 @@ class BukidService {
   }
 
   /**
- * Get filtered statistics for bukids (supports same filters as findAll)
- * @param {Object} options - { sessionId, status, search }
- * @returns {Promise<Object>} - totals and breakdowns
- */
-async getStatisticsWithFilters(options = {}) {
-  const { bukid: repo } = await this.getRepositories();
-  const qb = repo
-    .createQueryBuilder("bukid")
-    .leftJoin("bukid.session", "session")
-    .where("bukid.deletedAt IS NULL");
+   * Get filtered statistics for bukids (supports same filters as findAll)
+   * @param {Object} options - { sessionId, status, search }
+   * @returns {Promise<Object>} - totals and breakdowns
+   */
+  async getStatisticsWithFilters(options = {}) {
+    const { bukid: repo } = await this.getRepositories();
+    const qb = repo
+      .createQueryBuilder("bukid")
+      .leftJoin("bukid.session", "session")
+      .where("bukid.deletedAt IS NULL");
 
-  // Apply filters
-  if (options.sessionId) {
-    qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
-  }
-  if (options.status) {
-    qb.andWhere("bukid.status = :status", { status: options.status });
-  }
-  if (options.search) {
-    qb.andWhere("(bukid.name LIKE :search OR bukid.location LIKE :search OR bukid.description LIKE :search)", {
-      search: `%${options.search}%`,
-    });
-  }
+    // Apply filters
+    if (options.sessionId) {
+      qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
+    }
+    if (options.status) {
+      qb.andWhere("bukid.status = :status", { status: options.status });
+    }
+    if (options.search) {
+      qb.andWhere(
+        "(bukid.name LIKE :search OR bukid.location LIKE :search OR bukid.description LIKE :search)",
+        {
+          search: `%${options.search}%`,
+        },
+      );
+    }
 
-  // Get total count
-  const total = await qb.getCount();
+    // Get total count
+    const total = await qb.getCount();
 
-  // Get status breakdown
-  const statusCounts = await qb
-    .clone()
-    .select("bukid.status", "status")
-    .addSelect("COUNT(bukid.id)", "count")
-    .groupBy("bukid.status")
-    .getRawMany();
+    // Get status breakdown
+    const statusCounts = await qb
+      .clone()
+      .select("bukid.status", "status")
+      .addSelect("COUNT(bukid.id)", "count")
+      .groupBy("bukid.status")
+      .getRawMany();
 
-  const breakdown = statusCounts.reduce((acc, row) => {
-    acc[row.status] = parseInt(row.count, 10);
-    return acc;
-  }, {});
+    const breakdown = statusCounts.reduce((acc, row) => {
+      acc[row.status] = parseInt(row.count, 10);
+      return acc;
+    }, {});
 
-  // Get total area (sum of area)
-  const totalAreaResult = await qb
-    .clone()
-    .select("SUM(bukid.area)", "totalArea")
-    .getRawOne();
-  const totalArea = parseFloat(totalAreaResult.totalArea) || 0;
+    // Get total area (sum of area)
+    const totalAreaResult = await qb
+      .clone()
+      .select("SUM(bukid.area)", "totalArea")
+      .getRawOne();
+    const totalArea = parseFloat(totalAreaResult.totalArea) || 0;
 
-  // Get total pitaks (sum of pitaks across filtered bukids) – requires joining pitaks
-  // This is optional; if you want total pitaks count for summary cards, uncomment:
-  /*
+    // Get total pitaks (sum of pitaks across filtered bukids) – requires joining pitaks
+    // This is optional; if you want total pitaks count for summary cards, uncomment:
+    /*
   const totalPitaksResult = await qb
     .clone()
     .leftJoin("bukid.pitaks", "pitak")
@@ -437,16 +539,16 @@ async getStatisticsWithFilters(options = {}) {
   const totalPitaks = parseInt(totalPitaksResult.totalPitaks) || 0;
   */
 
-  return {
-    total,
-    active: breakdown.active || 0,
-    completed: breakdown.completed || 0,
-    cancelled: breakdown.cancelled || 0,
-    initiated: breakdown.initiated || 0,
-    totalArea,
-    // totalPitaks, // uncomment if needed
-  };
-}
+    return {
+      total,
+      active: breakdown.active || 0,
+      completed: breakdown.completed || 0,
+      cancelled: breakdown.cancelled || 0,
+      initiated: breakdown.initiated || 0,
+      totalArea,
+      // totalPitaks, // uncomment if needed
+    };
+  }
 
   /**
    * Export bukids to CSV or JSON
@@ -461,8 +563,16 @@ async getStatisticsWithFilters(options = {}) {
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Name", "Location", "Area", "Description", "Status",
-        "Session ID", "Session Name", "Created At", "Updated At"
+        "ID",
+        "Name",
+        "Location",
+        "Area",
+        "Description",
+        "Status",
+        "Session ID",
+        "Session Name",
+        "Created At",
+        "Updated At",
       ];
       const rows = bukids.map((b) => [
         b.id,

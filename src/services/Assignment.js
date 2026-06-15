@@ -100,9 +100,15 @@ class AssignmentService {
       const session = await sessionRepo.findOne({
         where: { id: data.sessionId },
       });
+      
       if (!session)
         throw new Error(`Session with ID ${data.sessionId} not found`);
 
+      if (session.status !== "active") {
+        throw new Error(
+          `Cannot create assignment because session "${session.name}" is not active. Only active sessions allow creation.`,
+        );
+      }
       // Check uniqueness (worker + pitak + session) – exclude soft-deleted
       const existing = await assignmentRepo.findOne({
         where: {
@@ -163,7 +169,11 @@ class AssignmentService {
         relations: ["worker", "pitak", "session"],
       });
       if (!existing) throw new Error(`Assignment with ID ${id} not found`);
-
+      if (existing.session.status !== "active") {
+        throw new Error(
+          `Cannot update assignment #${existing.id} because its session (${existing.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       const oldData = { ...existing };
 
       // Allowed fields: notes, assignmentDate only
@@ -207,9 +217,14 @@ class AssignmentService {
 
     const assignment = await assignmentRepo.findOne({
       where: { id, deletedAt: null },
+      relations: ["session"],
     });
     if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
-
+    if (assignment.session.status !== "active") {
+      throw new Error(
+        `Cannot change status of assignment #${assignment.id} because its session (${assignment.session.name}) is not active. Only active sessions allow modifications.`,
+      );
+    }
     const oldStatus = assignment.status;
     if (oldStatus === newStatus) return assignment;
 
@@ -264,9 +279,14 @@ class AssignmentService {
     try {
       const assignment = await assignmentRepo.findOne({
         where: { id, deletedAt: null },
+        relations: ["session"],
       });
       if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
-
+      if (assignment.session.status !== "active") {
+        throw new Error(
+          `Cannot delete assignment #${assignment.id} because its session (${assignment.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       const oldData = { ...assignment };
       assignment.deletedAt = new Date();
       assignment.updatedAt = new Date();
@@ -298,11 +318,16 @@ class AssignmentService {
       const assignment = await assignmentRepo.findOne({
         where: { id },
         withDeleted: true,
+        relations: ["session"],
       });
       if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
       if (!assignment.deletedAt)
         throw new Error(`Assignment #${id} is not deleted`);
-
+      if (assignment.session.status !== "active") {
+        throw new Error(
+          `Cannot restore assignment #${assignment.id} because its session (${assignment.session.name}) is not active. Only active sessions allow modifications.`,
+        );
+      }
       assignment.deletedAt = null;
       assignment.updatedAt = new Date();
 
@@ -338,9 +363,14 @@ class AssignmentService {
     const assignment = await assignmentRepo.findOne({
       where: { id },
       withDeleted: true,
+      relations: ["session"],
     });
     if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
-
+    if (assignment.session.status !== "active") {
+      throw new Error(
+        `Cannot delete assignment #${assignment.id} because its session (${assignment.session.name}) is not active. Only active sessions allow modifications.`,
+      );
+    }
     await removeDb(assignmentRepo, assignment);
     await auditLogger.logDelete("Assignment", id, assignment, user);
     console.log(`Assignment #${id} permanently deleted`);

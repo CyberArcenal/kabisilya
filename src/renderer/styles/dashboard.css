@@ -1,0 +1,58 @@
+/* Dashboard specific animations & enhancements */
+.dashboard-container {
+  background: radial-gradient(circle at 10% 20%, rgba(46, 125, 50, 0.03) 0%, transparent 50%);
+}
+
+/* Custom scrollbar for activities */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--card-secondary-bg);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 10px;
+}
+
+/* Skeleton loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.animate-pulse {
+  background: linear-gradient(90deg, var(--card-bg) 0%, var(--card-secondary-bg) 50%, var(--card-bg) 100%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* Gradient text for headings */
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 1rem;
+  }
+  .kpi-card-value {
+    font-size: 1.5rem;
+  }
+}
+
+/* Ensure all three dashboard bottom cards have equal height */
+.dashboard-bottom-cards > div {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Optional: limit the list height to avoid overflow, but keep card flexible */
+.dashboard-bottom-cards .overflow-y-auto {
+  max-height: 280px; /* Adjust as needed, but the flex column will grow naturally */
+}

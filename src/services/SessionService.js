@@ -1,6 +1,6 @@
 // services/SessionService.js
 // Refactored to follow the same structure as DebtService, AssignmentService, etc.
-
+const { Not } = require("typeorm");
 const auditLogger = require("../utils/auditLogger");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 
@@ -34,9 +34,12 @@ class SessionService {
    * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
-    const qrType = qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
     const hasManager = qr && typeof qr === "object" && !!qr.manager;
-    console.log(`[Session._getRepo] qr type: ${qrType}, has manager: ${hasManager}`);
+    console.log(
+      `[Session._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
 
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
@@ -145,14 +148,33 @@ class SessionService {
     };
 
     if (!allowedTransitions[oldStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${oldStatus} to ${newStatus}`);
+      throw new Error(
+        `Invalid status transition from ${oldStatus} to ${newStatus}`,
+      );
+    }
+
+    if (newStatus === "active") {
+      const otherActive = await repo.findOne({
+        where: { status: "active", deletedAt: null, id: Not(id) },
+      });
+      if (otherActive) {
+        throw new Error(
+          `Cannot activate session "${session.name}" because session "${otherActive.name}" is already active. Please close or archive the active session first.`,
+        );
+      }
     }
 
     session.status = newStatus;
     session.updatedAt = new Date();
 
     const saved = await updateDb(repo, session, { queryRunner: qr });
-    await auditLogger.logUpdate("Session", id, { status: oldStatus }, { status: newStatus }, user);
+    await auditLogger.logUpdate(
+      "Session",
+      id,
+      { status: oldStatus },
+      { status: newStatus },
+      user,
+    );
     return saved;
   }
 
@@ -170,7 +192,8 @@ class SessionService {
     try {
       const session = await repo.findOne({ where: { id, deletedAt: null } });
       if (!session) throw new Error(`Session with ID ${id} not found`);
-      if (session.deletedAt) throw new Error(`Session #${id} is already deleted`);
+      if (session.deletedAt)
+        throw new Error(`Session #${id} is already deleted`);
 
       const oldData = { ...session };
       session.deletedAt = new Date();
@@ -206,7 +229,13 @@ class SessionService {
       session.updatedAt = new Date();
 
       const saved = await updateDb(repo, session, { queryRunner: qr });
-      await auditLogger.logUpdate("Session", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "Session",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Session restored: #${id}`);
       return saved;
     } catch (error) {
@@ -282,18 +311,27 @@ class SessionService {
       qb.andWhere("session.year = :year", { year: options.year });
     }
     if (options.seasonType) {
-      qb.andWhere("session.seasonType = :seasonType", { seasonType: options.seasonType });
+      qb.andWhere("session.seasonType = :seasonType", {
+        seasonType: options.seasonType,
+      });
     }
     if (options.startDateFrom) {
-      qb.andWhere("session.startDate >= :startDateFrom", { startDateFrom: new Date(options.startDateFrom) });
+      qb.andWhere("session.startDate >= :startDateFrom", {
+        startDateFrom: new Date(options.startDateFrom),
+      });
     }
     if (options.startDateTo) {
-      qb.andWhere("session.startDate <= :startDateTo", { startDateTo: new Date(options.startDateTo) });
+      qb.andWhere("session.startDate <= :startDateTo", {
+        startDateTo: new Date(options.startDateTo),
+      });
     }
     if (options.search) {
-      qb.andWhere("(session.name LIKE :search OR session.seasonType LIKE :search)", {
-        search: `%${options.search}%`,
-      });
+      qb.andWhere(
+        "(session.name LIKE :search OR session.seasonType LIKE :search)",
+        {
+          search: `%${options.search}%`,
+        },
+      );
     }
 
     // Sorting
@@ -316,12 +354,23 @@ class SessionService {
    */
   async getStatistics() {
     const repo = await this.getRepository();
-    const qb = repo.createQueryBuilder("session").where("session.deletedAt IS NULL");
+    const qb = repo
+      .createQueryBuilder("session")
+      .where("session.deletedAt IS NULL");
 
     const total = await qb.getCount();
-    const active = await qb.clone().andWhere("session.status = :status", { status: "active" }).getCount();
-    const closed = await qb.clone().andWhere("session.status = :status", { status: "closed" }).getCount();
-    const archived = await qb.clone().andWhere("session.status = :status", { status: "archived" }).getCount();
+    const active = await qb
+      .clone()
+      .andWhere("session.status = :status", { status: "active" })
+      .getCount();
+    const closed = await qb
+      .clone()
+      .andWhere("session.status = :status", { status: "closed" })
+      .getCount();
+    const archived = await qb
+      .clone()
+      .andWhere("session.status = :status", { status: "archived" })
+      .getCount();
 
     // Year breakdown
     const yearCounts = await qb
@@ -356,8 +405,15 @@ class SessionService {
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Name", "Year", "Start Date", "End Date", "Season Type", "Status",
-        "Created At", "Updated At"
+        "ID",
+        "Name",
+        "Year",
+        "Start Date",
+        "End Date",
+        "Season Type",
+        "Status",
+        "Created At",
+        "Updated At",
       ];
       const rows = sessions.map((s) => [
         s.id,

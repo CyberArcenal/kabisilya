@@ -59,7 +59,7 @@ const AuditPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Audit Trail</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">System activity and change history</p>
         </div>
-        <Button variant="secondary" size="md" icon={Download} onClick={handleExportCSV}>
+        <Button variant="secondary" size="sm" icon={Download} onClick={handleExportCSV}>
           Export CSV
         </Button>
       </div>

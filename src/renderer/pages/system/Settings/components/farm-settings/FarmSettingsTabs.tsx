@@ -5,13 +5,13 @@ import { Calendar, MapPin, UserCheck, CreditCard, FileText, Shield, Bell } from 
 type FarmTabId = "session" | "bukid" | "pitak" | "assignment" | "payment" | "debt" | "audit" | "notifications";
 
 const tabs: { id: FarmTabId; label: string; icon: React.ElementType }[] = [
-  { id: "session", label: "Session", icon: Calendar },
-  { id: "bukid", label: "Bukid", icon: MapPin },
-  { id: "pitak", label: "Pitak", icon: MapPin },
+  // { id: "session", label: "Session", icon: Calendar },
+  // { id: "bukid", label: "Bukid", icon: MapPin },
+  // { id: "pitak", label: "Pitak", icon: MapPin },
   { id: "assignment", label: "Assignment", icon: UserCheck },
   { id: "payment", label: "Payment", icon: CreditCard },
-  { id: "debt", label: "Debt", icon: FileText },
-  { id: "audit", label: "Audit", icon: Shield },
+  // { id: "debt", label: "Debt", icon: FileText },
+  // { id: "audit", label: "Audit", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 

@@ -133,7 +133,7 @@ const DebtManagementPage: React.FC = () => {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <Button variant="primary" size="md" icon={Plus} onClick={handleAddNew}>
+          <Button variant="primary" size="sm" icon={Plus} onClick={handleAddNew}>
             Create Debt
           </Button>
         </div>

@@ -11,7 +11,7 @@ interface TopBarProps {
 const TopBar: React.FC<TopBarProps> = ({ toggleSidebar }) => {
   return (
     <header
-      className="sticky top-0 z-40 windows-card border-b"
+      className="sticky top-0 z-40 windows-card"
       style={{
         background: "var(--sidebar-bg)",
         borderColor: "var(--sidebar-border)",
