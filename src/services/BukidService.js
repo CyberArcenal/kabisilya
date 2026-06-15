@@ -79,7 +79,7 @@ class BukidService {
       });
       if (!session)
         throw new Error(`Session with ID ${data.sessionId} not found`);
-      
+
       if (session.status !== "active") {
         throw new Error(
           `Cannot create bukid because session "${session.name}" is not active. Only active sessions allow creation.`,
@@ -231,6 +231,7 @@ class BukidService {
         where: { id, deletedAt: null },
         relations: ["session"],
       });
+      
       if (!bukid) throw new Error(`Bukid with ID ${id} not found`);
       if (bukid.deletedAt) throw new Error(`Bukid #${id} is already deleted`);
       if (bukid.session.status !== "active") {
