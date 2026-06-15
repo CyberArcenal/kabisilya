@@ -70,13 +70,13 @@ export const menuItems: MenuItem[] = [
     children: [
       {
         path: "/finance/worker-payment-summary",
-        name: "Worker Payments",
-        icon: HandCoins,
+        name: "Worker Payment Summary",
+        icon: Receipt, // <-- palitan mula HandCoins
       },
       {
         path: "/finance/worker/payments",
-        name: "Payments",
-        icon: HandCoins,
+        name: "Payment Management",
+        icon: HandCoins, // iwan
       },
 
       // { path: "/finance/payments", name: "Payments", icon: Banknote },

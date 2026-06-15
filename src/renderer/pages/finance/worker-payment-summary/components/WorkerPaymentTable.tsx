@@ -1,4 +1,4 @@
-// src/renderer/pages/finance/worker-payment-summary/components/WorkerPaymentTable.tsx
+// components/WorkerPaymentTable.tsx
 import React from "react";
 import { Eye, CreditCard, Trash2 } from "lucide-react";
 import type { WorkerPaymentSummary } from "../utils/aggregatePayments";
@@ -17,21 +17,11 @@ interface Props {
 }
 
 const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
-    amount,
-  );
+  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(amount);
 
-const SortIndicator = ({
-  field,
-  currentSortBy,
-  sortOrder,
-}: {
-  field: string;
-  currentSortBy: string;
-  sortOrder: string;
-}) => {
-  if (currentSortBy !== field) return null;
-  return <span className="ml-1">{sortOrder === "ASC" ? "↑" : "↓"}</span>;
+const SortIcon = ({ active, order }: { active: boolean; order: "ASC" | "DESC" }) => {
+  if (!active) return <span className="ml-1 opacity-30">↕️</span>;
+  return <span className="ml-1">{order === "ASC" ? "↑" : "↓"}</span>;
 };
 
 export const WorkerPaymentTable: React.FC<Props> = ({
@@ -46,186 +36,97 @@ export const WorkerPaymentTable: React.FC<Props> = ({
   sortOrder,
   onSort,
 }) => {
-  const allSelected =
-    workers.length > 0 &&
-    workers.every((w) => selectedIds.includes(w.workerId));
+  const allSelected = workers.length > 0 && workers.every((w) => selectedIds.includes(w.workerId));
   const someSelected = selectedIds.length > 0 && !allSelected;
 
-  if (workers.length === 0) {
-    return (
-      <div className="text-center py-8 text-[var(--text-tertiary)] border border-[var(--border-color)] rounded-xl bg-[var(--card-bg)]">
-        No workers found
-      </div>
-    );
-  }
+  if (workers.length === 0) return null; // handled by parent
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)]">
+    <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] shadow-sm">
       <table className="w-full text-sm">
         <thead className="bg-[var(--card-secondary-bg)] border-b border-[var(--border-color)]">
           <tr>
-            <th className="py-2 px-3 w-8">
+            <th className="py-3 px-3 w-8">
               <input
                 type="checkbox"
                 checked={allSelected}
-                ref={(input) => {
-                  if (input) input.indeterminate = someSelected;
-                }}
+                ref={(input) => input && (input.indeterminate = someSelected)}
                 onChange={(e) => onSelectAll(e.target.checked)}
-                className="rounded border-[var(--border-color)] cursor-pointer"
+                className="rounded cursor-pointer"
               />
             </th>
-            <th
-              className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("workerName")}
-            >
-              Worker{" "}
-              <SortIndicator
-                field="workerName"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th
-              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("totalOutstandingPayments")}
-            >
-              Pending Payments{" "}
-              <SortIndicator
-                field="totalOutstandingPayments"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th
-              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("totalDebtBalance")}
-            >
-              Outstanding Debt{" "}
-              <SortIndicator
-                field="totalDebtBalance"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th
-              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("totalGross")}
-            >
-              Total Gross{" "}
-              <SortIndicator
-                field="totalGross"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th
-              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("totalDebtDeduction")}
-            >
-              Debt Deduction{" "}
-              <SortIndicator
-                field="totalDebtDeduction"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th
-              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("totalNet")}
-            >
-              Total Net{" "}
-              <SortIndicator
-                field="totalNet"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th
-              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("totalPaid")}
-            >
-              Total Paid{" "}
-              <SortIndicator
-                field="totalPaid"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th
-              className="text-center py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-              onClick={() => onSort("paymentCount")}
-            >
-              # Payments{" "}
-              <SortIndicator
-                field="paymentCount"
-                currentSortBy={sortBy}
-                sortOrder={sortOrder}
-              />
-            </th>
-            <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)]">
-              Actions
-            </th>
+            {[
+              { key: "workerName", label: "Worker" },
+              { key: "totalOutstandingPayments", label: "Pending ₱" },
+              { key: "totalDebtBalance", label: "Debt ₱" },
+              { key: "totalGross", label: "Gross ₱" },
+              { key: "totalDebtDeduction", label: "Debt Deducted ₱" },
+              { key: "totalNet", label: "Net ₱" },
+              { key: "totalPaid", label: "Paid ₱" },
+              { key: "paymentCount", label: "# Payments" },
+            ].map((col) => (
+              <th
+                key={col.key}
+                className="text-left py-3 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)] transition-colors"
+                onClick={() => onSort(col.key)}
+              >
+                <div className="flex items-center gap-1">
+                  {col.label}
+                  <SortIcon active={sortBy === col.key} order={sortOrder} />
+                </div>
+              </th>
+            ))}
+            <th className="text-left py-3 px-3 font-semibold text-[var(--text-secondary)]">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {workers.map((worker) => (
+          {workers.map((worker, idx) => (
             <tr
               key={worker.workerId}
-              className="border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors"
+              className={`border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors ${
+                idx % 2 === 0 ? "bg-[var(--card-bg)]" : "bg-[var(--card-secondary-bg)]/50"
+              }`}
             >
-              <td className="py-1.5 px-3">
+              <td className="py-2 px-3">
                 <input
                   type="checkbox"
                   checked={selectedIds.includes(worker.workerId)}
-                  onChange={(e) =>
-                    onSelectRow(worker.workerId, e.target.checked)
-                  }
-                  className="rounded border-[var(--border-color)] cursor-pointer"
+                  onChange={(e) => onSelectRow(worker.workerId, e.target.checked)}
+                  className="rounded cursor-pointer"
                 />
               </td>
-              <td className="py-1.5 px-3 font-medium text-[var(--text-primary)]">
-                {worker.workerName}
+              <td className="py-2 px-3 font-medium text-[var(--text-primary)]">{worker.workerName}</td>
+              <td className="py-2 px-3 text-amber-600 font-medium">{formatCurrency(worker.totalOutstandingPayments)}</td>
+              <td className="py-2 px-3 text-red-500 font-medium">{formatCurrency(worker.totalDebtBalance)}</td>
+              <td className="py-2 px-3 text-[var(--text-secondary)]">{formatCurrency(worker.totalGross)}</td>
+              <td className="py-2 px-3 text-red-500">{formatCurrency(worker.totalDebtDeduction)}</td>
+              <td className="py-2 px-3 font-bold text-emerald-600">{formatCurrency(worker.totalNet)}</td>
+              <td className="py-2 px-3 text-[var(--text-secondary)]">{formatCurrency(worker.totalPaid)}</td>
+              <td className="py-2 px-3 text-center">
+                <span className="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full text-xs text-white">
+                  {worker.paymentCount}
+                </span>
               </td>
-              <td className="py-1.5 px-3 text-right text-amber-600">
-                {formatCurrency(worker.totalOutstandingPayments)}
-              </td>
-              <td className="py-1.5 px-3 text-right text-red-500">
-                {formatCurrency(worker.totalDebtBalance)}
-              </td>
-              <td className="py-1.5 px-3 text-right text-[var(--text-secondary)]">
-                {formatCurrency(worker.totalGross)}
-              </td>
-              <td className="py-1.5 px-3 text-right text-red-500">
-                {formatCurrency(worker.totalDebtDeduction)}
-              </td>
-              <td className="py-1.5 px-3 text-right font-bold text-emerald-600">
-                {formatCurrency(worker.totalNet)}
-              </td>
-              <td className="py-1.5 px-3 text-right text-[var(--text-secondary)]">
-                {formatCurrency(worker.totalPaid)}
-              </td>
-              <td className="py-1.5 px-3 text-center">{worker.paymentCount}</td>
-              <td className="py-1.5 px-3">
+              <td className="py-2 px-3">
                 <div className="flex gap-2">
                   <button
                     onClick={() => onViewWorker(worker)}
-                    className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] text-sky-500"
-                    title="View payments"
+                    className="p-1.5 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-600 transition-colors"
+                    title="View all payments"
                   >
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onRecordPayment(worker)}
-                    className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] text-emerald-500"
-                    title="Record payment"
+                    className="p-1.5 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 transition-colors"
+                    title="Record payment for this worker"
                   >
                     <CreditCard className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onDeleteWorker(worker.workerId)}
-                    className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] text-red-500"
-                    title="Delete all payments"
+                    className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 transition-colors"
+                    title="Delete all payments of this worker"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

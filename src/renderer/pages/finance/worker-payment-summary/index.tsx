@@ -1,6 +1,17 @@
 // src/renderer/pages/finance/worker-payment-summary/index.tsx
 import React, { useState } from "react";
-import { Filter, RefreshCw, Eye, EyeOff, Download } from "lucide-react";
+import {
+  Filter,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Download,
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Wallet,
+} from "lucide-react";
 import Button from "../../../components/UI/Button";
 import Pagination from "../../../components/UI/Pagination";
 import LoadingSpinner from "../../../components/Shared/LoadingSpinner";
@@ -9,6 +20,9 @@ import { useWorkerPaymentSummary } from "./hooks";
 import { WorkerPaymentTable } from "./components/WorkerPaymentTable";
 import { RecordWorkerPaymentModal } from "./components/RecordWorkerPaymentModal";
 import { ViewWorkerPaymentsModal } from "./components/ViewWorkerPaymentsModal";
+import { SummaryCard } from "./components/SummaryCard";
+import { EmptyState } from "./components/EmptyState";
+
 
 const WorkerPaymentSummaryPage: React.FC = () => {
   const {
@@ -42,27 +56,26 @@ const WorkerPaymentSummaryPage: React.FC = () => {
   } = useWorkerPaymentSummary();
 
   const [showFilters, setShowFilters] = useState(false);
-  const [showStats, setShowStats] = useState(false);
+  const [showStats, setShowStats] = useState(true);
 
-  // Export all workers summary to CSV
+  // Calculate totals from current workers (already filtered)
+  const totals = {
+    workers: totalCount,
+    totalGross: workers.reduce((sum, w) => sum + w.totalGross, 0),
+    totalNet: workers.reduce((sum, w) => sum + w.totalNet, 0),
+    totalDebt: workers.reduce((sum, w) => sum + w.totalDebtBalance, 0),
+  };
+
   const exportToCSV = () => {
+    // same as before but with more fields
     const headers = [
-      "Worker ID",
-      "Worker Name",
-      "Total Gross",
-      "Total Debt Deduction",
-      "Total Net",
-      "Total Paid",
-      "Payment Count",
+      "Worker ID", "Worker Name", "Total Gross", "Total Debt Deduction",
+      "Total Net", "Total Paid", "Payment Count", "Pending Payments", "Outstanding Debt",
     ];
     const rows = workers.map(w => [
-      w.workerId,
-      w.workerName,
-      w.totalGross,
-      w.totalDebtDeduction,
-      w.totalNet,
-      w.totalPaid,
-      w.paymentCount,
+      w.workerId, w.workerName, w.totalGross, w.totalDebtDeduction,
+      w.totalNet, w.totalPaid, w.paymentCount,
+      w.totalOutstandingPayments, w.totalDebtBalance,
     ]);
     const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
@@ -75,11 +88,11 @@ const WorkerPaymentSummaryPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-4">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="p-6 space-y-6 animate-fadeIn">
+      {/* Header with gradient */}
+      <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-500 bg-clip-text text-transparent">
             Worker Payment Summary
           </h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
@@ -89,21 +102,21 @@ const WorkerPaymentSummaryPage: React.FC = () => {
         <div className="flex gap-2">
           <button
             onClick={() => setShowStats(!showStats)}
-            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors"
+            className="p-2 rounded-lg hover:bg-[var(--card-hover-bg)] transition-all"
             title={showStats ? "Hide summary cards" : "Show summary cards"}
           >
             {showStats ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors"
-            title={showFilters ? "Hide filters" : "Show filters"}
+            className="p-2 rounded-lg hover:bg-[var(--card-hover-bg)] transition-all"
+            title="Toggle filters"
           >
             <Filter className="w-4 h-4" />
           </button>
           <button
             onClick={exportToCSV}
-            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors"
+            className="p-2 rounded-lg hover:bg-[var(--card-hover-bg)] transition-all"
             title="Export summary to CSV"
           >
             <Download className="w-4 h-4" />
@@ -111,52 +124,50 @@ const WorkerPaymentSummaryPage: React.FC = () => {
           <button
             onClick={refresh}
             disabled={loading}
-            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] transition-colors disabled:opacity-50"
-            title="Refresh"
+            className="p-2 rounded-lg hover:bg-[var(--card-hover-bg)] transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
 
-      {/* Summary Cards (optional) */}
+      {/* Summary Cards */}
       {showStats && (
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-[var(--card-bg)] rounded-xl p-4 border">
-            <p className="text-sm text-[var(--text-secondary)]">Total Workers</p>
-            <p className="text-2xl font-bold">{totalCount}</p>
-          </div>
-          <div className="bg-[var(--card-bg)] rounded-xl p-4 border">
-            <p className="text-sm text-[var(--text-secondary)]">Total Gross</p>
-            <p className="text-2xl font-bold">
-              {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
-                workers.reduce((s, w) => s + w.totalGross, 0)
-              )}
-            </p>
-          </div>
-          <div className="bg-[var(--card-bg)] rounded-xl p-4 border">
-            <p className="text-sm text-[var(--text-secondary)]">Total Net</p>
-            <p className="text-2xl font-bold">
-              {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
-                workers.reduce((s, w) => s + w.totalNet, 0)
-              )}
-            </p>
-          </div>
-          <div className="bg-[var(--card-bg)] rounded-xl p-4 border">
-            <p className="text-sm text-[var(--text-secondary)]">Total Debt Deducted</p>
-            <p className="text-2xl font-bold">
-              {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
-                workers.reduce((s, w) => s + w.totalDebtDeduction, 0)
-              )}
-            </p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <SummaryCard
+            title="Total Workers"
+            value={totals.workers}
+            icon={Users}
+            color="emerald"
+          />
+          <SummaryCard
+            title="Total Gross Pay"
+            value={totals.totalGross}
+            icon={TrendingUp}
+            color="blue"
+            isCurrency
+          />
+          <SummaryCard
+            title="Total Net Pay"
+            value={totals.totalNet}
+            icon={Wallet}
+            color="green"
+            isCurrency
+          />
+          <SummaryCard
+            title="Total Outstanding Debt"
+            value={totals.totalDebt}
+            icon={TrendingDown}
+            color="orange"
+            isCurrency
+          />
         </div>
       )}
 
       {/* Filters Bar */}
       {showFilters && (
-        <div className="bg-[var(--card-bg)] rounded-xl p-4 border space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-[var(--card-bg)] rounded-xl p-5 border border-[var(--border-color)] shadow-sm transition-all">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <input
               type="text"
               placeholder="Search worker name..."
@@ -165,7 +176,7 @@ const WorkerPaymentSummaryPage: React.FC = () => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              className="px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
               style={{
                 backgroundColor: "var(--input-bg)",
                 borderColor: "var(--input-border)",
@@ -182,13 +193,12 @@ const WorkerPaymentSummaryPage: React.FC = () => {
             />
             <input
               type="date"
-              placeholder="Start date"
               value={filters.startDate}
               onChange={(e) => {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="px-3 py-2 rounded-lg border"
+              className="px-4 py-2 rounded-lg border"
               style={{
                 backgroundColor: "var(--input-bg)",
                 borderColor: "var(--input-border)",
@@ -197,13 +207,12 @@ const WorkerPaymentSummaryPage: React.FC = () => {
             />
             <input
               type="date"
-              placeholder="End date"
               value={filters.endDate}
               onChange={(e) => {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className="px-3 py-2 rounded-lg border"
+              className="px-4 py-2 rounded-lg border"
               style={{
                 backgroundColor: "var(--input-bg)",
                 borderColor: "var(--input-border)",
@@ -212,15 +221,15 @@ const WorkerPaymentSummaryPage: React.FC = () => {
             />
           </div>
           {(filters.search || filters.sessionId || filters.startDate || filters.endDate) && (
-            <div className="flex justify-end">
+            <div className="flex justify-end mt-3">
               <button
                 onClick={() => {
                   resetFilters();
                   setPage(1);
                 }}
-                className="text-xs text-[var(--primary-color)] hover:underline"
+                className="text-sm text-[var(--primary-color)] hover:underline flex items-center gap-1"
               >
-                Clear all filters
+                <Filter className="w-3 h-3" /> Clear all filters
               </button>
             </div>
           )}
@@ -229,25 +238,21 @@ const WorkerPaymentSummaryPage: React.FC = () => {
 
       {/* Bulk Actions Bar */}
       {selectedWorkerIds.length > 0 && (
-        <div className="bg-[var(--primary-color)]/10 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-sm font-medium">{selectedWorkerIds.length} worker(s) selected</span>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onBulkStatusChange(selectedWorkerIds, "completed")}
-            >
-              Mark Completed
+        <div className="bg-[var(--primary-color)]/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 backdrop-blur-sm border border-[var(--primary-color)]/30 animate-slideDown">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow-sm">
+              {selectedWorkerIds.length} worker{selectedWorkerIds.length !== 1 ? "s" : ""} selected
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => onBulkStatusChange(selectedWorkerIds, "completed")}>
+              ✓ Mark Completed
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onBulkStatusChange(selectedWorkerIds, "cancelled")}
-            >
-              Cancel All
+            <Button variant="warning" size="sm" onClick={() => onBulkStatusChange(selectedWorkerIds, "cancelled")}>
+              ✗ Cancel All
             </Button>
             <Button variant="danger" size="sm" onClick={() => onBulkDelete(selectedWorkerIds)}>
-              Delete All Payments
+              🗑 Delete Payments
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setSelectedWorkerIds([])}>
               Clear
@@ -256,11 +261,18 @@ const WorkerPaymentSummaryPage: React.FC = () => {
         </div>
       )}
 
-      {/* Main Table */}
+      {/* Main Table or Loading / Empty */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <LoadingSpinner size="medium" />
+        <div className="space-y-4">
+          <div className="h-96 animate-pulse bg-[var(--card-secondary-bg)] rounded-xl" />
         </div>
+      ) : workers.length === 0 ? (
+        <EmptyState
+          title="No workers found"
+          description="Try adjusting your filters or create a new payment."
+          icon={Users}
+          onReset={resetFilters}
+        />
       ) : (
         <>
           <WorkerPaymentTable
@@ -281,15 +293,17 @@ const WorkerPaymentSummaryPage: React.FC = () => {
             sortOrder={sortOrder}
             onSort={setSort}
           />
-          <Pagination
-            currentPage={page}
-            totalItems={totalCount}
-            pageSize={limit}
-            onPageChange={setPage}
-            onPageSizeChange={setLimit}
-            pageSizeOptions={[10, 25, 50, 100]}
-            showPageSize={true}
-          />
+          <div className="mt-4">
+            <Pagination
+              currentPage={page}
+              totalItems={totalCount}
+              pageSize={limit}
+              onPageChange={setPage}
+              onPageSizeChange={setLimit}
+              pageSizeOptions={[10, 25, 50, 100]}
+              showPageSize
+            />
+          </div>
         </>
       )}
 
@@ -300,7 +314,6 @@ const WorkerPaymentSummaryPage: React.FC = () => {
         worker={viewModal.worker}
         onRefresh={refresh}
       />
-
       <RecordWorkerPaymentModal
         isOpen={recordModal.isOpen}
         onClose={recordModal.close}

@@ -481,7 +481,7 @@ class AssignmentService {
     }
     if (options.search) {
       qb.andWhere(
-        "(worker.name LIKE :search OR pitak.name LIKE :search OR assignment.notes LIKE :search)",
+        "(worker.name LIKE :search OR pitak.location LIKE :search OR assignment.notes LIKE :search)",
         { search: `%${options.search}%` },
       );
     }

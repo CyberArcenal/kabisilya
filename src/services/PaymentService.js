@@ -554,7 +554,7 @@ class PaymentService {
     }
     if (options.search) {
       qb.andWhere(
-        "(worker.name LIKE :search OR pitak.name LIKE :search OR payment.description LIKE :search)",
+        "(worker.name LIKE :search OR pitak.location LIKE :search OR payment.description LIKE :search)",
         { search: `%${options.search}%` },
       );
     }
@@ -968,7 +968,6 @@ class PaymentService {
     if (debtDeduction > totalAmount)
       throw new Error("Debt deduction cannot exceed total amount");
 
-    // Round totalAmount to 2 decimals
     const roundedTotal = roundToTwo(totalAmount);
     const roundedDeduction = roundToTwo(debtDeduction);
 
@@ -976,8 +975,8 @@ class PaymentService {
     const debtStats = await debtService.getStatisticsWithFilters({ workerId });
     const totalDebtBalance = roundToTwo(debtStats.totalBalance || 0);
 
-    // 3. Get total pending payments (ALL payments, no session filter)
-    const pendingPaymentsList = await paymentRepo.find({
+    // 3. Get all pending payments (FIFO: paymentDate ASC, createdAt ASC)
+    const pendingPayments = await paymentRepo.find({
       where: {
         worker: { id: workerId },
         status: In(["pending", "partially_paid"]),
@@ -985,7 +984,9 @@ class PaymentService {
       },
       order: { paymentDate: "ASC", createdAt: "ASC" },
     });
-    const rawPaymentsDue = pendingPaymentsList.reduce(
+
+    // Compute total due (pending payments balance + debt balance)
+    const rawPaymentsDue = pendingPayments.reduce(
       (sum, p) => sum + (p.netPay - (p.amountPaid || 0)),
       0,
     );
@@ -999,7 +1000,7 @@ class PaymentService {
       );
     }
 
-    // 4. Apply debt deduction (no sessionId)
+    // 4. Apply debt deduction to debts (this updates debt balances)
     let actualDebtDeducted = 0;
     if (roundedDeduction > 0) {
       actualDebtDeducted = await debtService.deductFromWorker(
@@ -1017,53 +1018,64 @@ class PaymentService {
       }
     }
 
-    // 5. Remaining amount for payments
-    let remainingForPayments = roundToTwo(roundedTotal - actualDebtDeducted);
-    if (remainingForPayments < 0) remainingForPayments = 0;
+    // 5. Distribute the combined amount (cash + debt deduction) across pending payments
+    let remainingCash = roundToTwo(roundedTotal - actualDebtDeducted);
+    let remainingDebt = actualDebtDeducted;
+    const updatedPayments = [];
 
-    if (remainingForPayments === 0) {
-      return {
-        success: true,
-        totalAmount: roundedTotal,
-        debtDeducted: actualDebtDeducted,
-        paymentsUpdated: 0,
-        remainingUnallocated: 0,
-      };
-    }
+    for (const payment of pendingPayments) {
+      if (remainingCash <= 0 && remainingDebt <= 0) break;
 
-    if (pendingPaymentsList.length === 0) {
-      throw new Error(
-        "No pending payments found for this worker, but remaining amount is non-zero.",
-      );
-    }
+      const gross = payment.grossPay;
+      const manualDed = payment.manualDeduction || 0;
+      const currentPaid = payment.amountPaid || 0;
+      const currentDebtDed = payment.debtDeductionTotal || 0;
 
-    // 6. Distribute remainingForPayments across payments (FIFO)
-    let remaining = remainingForPayments;
-    const updates = [];
-    for (const payment of pendingPaymentsList) {
-      if (remaining <= 0) break;
-      const due = payment.netPay - (payment.amountPaid || 0);
-      if (due <= 0) continue;
-      const payAmount = Math.min(remaining, due);
-      updates.push({ payment, amount: roundToTwo(payAmount) });
-      remaining = roundToTwo(remaining - payAmount);
-    }
+      // Total already processed for this payment (cash + debt)
+      const totalProcessed = currentPaid + currentDebtDed;
+      const needed = gross - manualDed - totalProcessed;
+      if (needed <= 0) continue;
 
-    if (updates.length === 0) {
-      throw new Error("No payments needed updating (all already paid?)");
-    }
+      // Apply debt deduction first
+      let debtToApply = 0;
+      if (remainingDebt > 0) {
+        debtToApply = Math.min(remainingDebt, needed);
+        remainingDebt = roundToTwo(remainingDebt - debtToApply);
+      }
 
-    // 7. Update each payment and create history
-    for (const { payment, amount } of updates) {
-      const oldAmountPaid = roundToTwo(payment.amountPaid || 0);
-      const newAmountPaid = roundToTwo(oldAmountPaid + amount);
+      // Then apply cash
+      let cashToApply = 0;
+      if (remainingCash > 0) {
+        const stillNeeded = needed - debtToApply;
+        if (stillNeeded > 0) {
+          cashToApply = Math.min(remainingCash, stillNeeded);
+          remainingCash = roundToTwo(remainingCash - cashToApply);
+        }
+      }
 
+      if (debtToApply === 0 && cashToApply === 0) continue;
+
+      // Compute new values
+      const newDebtDed = roundToTwo(currentDebtDed + debtToApply);
+      const newAmountPaid = roundToTwo(currentPaid + cashToApply);
+      const newNetPay = roundToTwo(gross - manualDed - newDebtDed);
+
+      // Determine status based on cash paid vs net pay
+      let newStatus;
+      if (newAmountPaid >= newNetPay) {
+        newStatus = "completed";
+      } else if (newAmountPaid > 0) {
+        newStatus = "partially_paid";
+      } else {
+        newStatus = "pending";
+      }
+
+      // Update payment object
+      payment.debtDeductionTotal = newDebtDed;
       payment.amountPaid = newAmountPaid;
-      payment.lastPaymentDate = new Date();
-      payment.netPay = roundToTwo(payment.netPay);
-      const newStatus =
-        newAmountPaid >= payment.netPay ? "completed" : "partially_paid";
+      payment.netPay = newNetPay;
       payment.status = newStatus;
+      payment.lastPaymentDate = new Date();
       payment.updatedAt = new Date();
 
       await updateDb(paymentRepo, payment, {
@@ -1071,30 +1083,68 @@ class PaymentService {
         skipSignal: false,
       });
 
-      const history = historyRepo.create({
-        payment,
-        actionType: "payment_recorded",
-        changedField: "amountPaid",
-        oldValue: oldAmountPaid.toString(),
-        newValue: newAmountPaid.toString(),
-        oldAmount: oldAmountPaid,
-        newAmount: newAmountPaid,
-        notes: `Part of bulk worker payment. Total: ${roundedTotal}, debt deducted: ${actualDebtDeducted}. ${notes || ""}`,
-        performedBy: user,
-        referenceNumber: referenceNumber,
+      // Create history entry for cash payment (if any)
+      if (cashToApply > 0) {
+        const cashHistory = historyRepo.create({
+          payment,
+          actionType: "payment_recorded",
+          changedField: "amountPaid",
+          oldValue: currentPaid.toString(),
+          newValue: newAmountPaid.toString(),
+          oldAmount: currentPaid,
+          newAmount: newAmountPaid,
+          notes: `Part of bulk worker payment. Total cash: ${roundedTotal}, debt deducted: ${actualDebtDeducted}. ${notes || ""}`,
+          performedBy: user,
+          referenceNumber: referenceNumber,
+        });
+        await saveDb(historyRepo, cashHistory, { queryRunner: qr });
+        await auditLogger.logCreate(
+          "PaymentHistory",
+          cashHistory.id,
+          cashHistory,
+          user,
+        );
+      }
+
+      // Create history entry for debt deduction (if any)
+      if (debtToApply > 0) {
+        const debtHistory = historyRepo.create({
+          payment,
+          actionType: "debt_deduction",
+          changedField: "debtDeductionTotal",
+          oldValue: currentDebtDed.toString(),
+          newValue: newDebtDed.toString(),
+          notes: `Debt deduction applied: ${debtToApply} from bulk payment.`,
+          performedBy: user,
+          referenceNumber: referenceNumber,
+        });
+        await saveDb(historyRepo, debtHistory, { queryRunner: qr });
+        await auditLogger.logCreate(
+          "PaymentHistory",
+          debtHistory.id,
+          debtHistory,
+          user,
+        );
+      }
+
+      updatedPayments.push({
+        id: payment.id,
+        cashToApply,
+        debtToApply,
+        newStatus,
       });
-      await saveDb(historyRepo, history, { queryRunner: qr });
-      await auditLogger.logCreate("PaymentHistory", history.id, history, user);
     }
 
     return {
       success: true,
       totalAmount: roundedTotal,
       debtDeducted: actualDebtDeducted,
-      paymentsUpdated: updates.length,
-      remainingUnallocated: remaining,
+      paymentsUpdated: updatedPayments.length,
+      remainingUnallocatedCash: remainingCash,
+      remainingUnallocatedDebt: remainingDebt,
       totalPaymentsDue,
       totalDebtBalance,
+      details: updatedPayments,
     };
   }
 }
