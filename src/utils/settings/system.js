@@ -516,7 +516,6 @@ async function farmDebtAutoApplyInterest() {
   return getBool("auto_apply_interest", SettingType.FARM_DEBT, false);
 }
 
-
 // ============================================================
 // 🔔 NOTIFICATION SETTINGS (original)
 // ============================================================
@@ -635,7 +634,6 @@ async function getTwilioConfig() {
   };
 }
 
-
 // ============================================================
 // 📝 FARM AUDIT SETTINGS
 // ============================================================
@@ -649,9 +647,14 @@ async function logRetentionDays() {
 }
 
 async function logEvents() {
-  return getArray("log_events", SettingType.FARM_AUDIT, ["CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT"]);
+  return getArray("log_events", SettingType.FARM_AUDIT, [
+    "CREATE",
+    "UPDATE",
+    "DELETE",
+    "LOGIN",
+    "LOGOUT",
+  ]);
 }
-
 
 async function farmAuditTrackEntityId() {
   return getBool("track_entity_id", SettingType.FARM_AUDIT, true);
@@ -704,20 +707,15 @@ async function farmRatePerLuwang() {
   const value = await getValue(
     "rate_per_luwang",
     SettingType.FARM_PAYMENT,
-
     // @ts-ignore
-    "230.00",
+    "230",
   );
-
-  // @ts-ignore
   const rate = parseFloat(value);
-
-  if (isNaN(rate)) {
+  if (isNaN(rate) || rate <= 0) {
     throw new Error(
-      "Invalid rate_per_luwang setting. Please check system settings.",
+      "Invalid or zero rate_per_luwang. Please set a positive value in system settings.",
     );
   }
-
   return rate;
 }
 

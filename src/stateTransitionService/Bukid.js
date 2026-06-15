@@ -38,7 +38,7 @@ class BukidStateTransitionService {
     }
 
     for (const pitak of bukid.pitaks) {
-      if (pitak.status === "completed") continue;
+      if (pitak.status === "completed" || pitak.status === "cancelled") continue;
       try {
         await pitakService.updateStatus(pitak.id, "completed", user, qr);
       } catch (error) {

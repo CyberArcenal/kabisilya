@@ -163,6 +163,8 @@ class PaymentService {
         session,
         assignment,
         amount: data.amount,
+        grossPay: data.grossPay ?? data.amount, // fallback to amount if not provided
+        netPay: data.netPay ?? data.amount, // fallback to amount if not provided
         paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
         description: data.description || null,
         status: data.status || "pending",

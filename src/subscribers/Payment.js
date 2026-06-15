@@ -3,6 +3,18 @@ const Payment = require("../entities/Payment");
 const { PaymentStateTransitionService } = require("../stateTransitionService/Payment");
 const { logger } = require("../utils/logger");
 
+// Helper para i-serialize ang entity nang ligtas (iwas circular reference)
+function safeStringify(obj) {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) return "[Circular]";
+      seen.add(value);
+    }
+    return value;
+  }, 2);
+}
+
 console.log("[Subscriber] Loading PaymentSubscriber");
 
 class PaymentSubscriber {
@@ -17,7 +29,9 @@ class PaymentSubscriber {
 
   async afterInsert(entity, { manager, queryRunner }) {
     try {
-      logger.info("[PaymentSubscriber] afterInsert", { id: entity.id });
+      logger.info("[PaymentSubscriber] afterInsert", {
+        entity: JSON.parse(safeStringify(entity))
+      });
     } catch (err) {
       logger.error("[PaymentSubscriber] afterInsert error", err);
     }
@@ -26,7 +40,14 @@ class PaymentSubscriber {
   async afterUpdate(event, { manager, queryRunner }) {
     const { databaseEntity, entity } = event;
     if (!entity) return;
-    logger.info("[PaymentSubscriber] afterUpdate", { id: entity.id, oldStatus: databaseEntity?.status, newStatus: entity.status });
+    
+    logger.info("[PaymentSubscriber] afterUpdate", {
+      id: entity.id,
+      oldStatus: databaseEntity?.status,
+      newStatus: entity.status,
+      fullEntity: JSON.parse(safeStringify(entity)),
+      oldEntity: databaseEntity ? JSON.parse(safeStringify(databaseEntity)) : null
+    });
 
     if (databaseEntity && databaseEntity.status === entity.status) return;
 

@@ -54,7 +54,7 @@ class PitakStateTransitionService {
     }
 
     for (const assignment of pitak.assignments) {
-      if (assignment.status === AssignmentStatus.COMPLETED) continue;
+      if (assignment.status === AssignmentStatus.COMPLETED || assignment.status === AssignmentStatus.CANCELLED) continue;
       try {
         // ✅ Tawagin ang service para sa validation at audit
         await assignmentService.updateStatus(

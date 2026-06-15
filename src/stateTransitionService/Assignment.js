@@ -125,20 +125,21 @@ class AssignmentStateTransitionService {
       const netPay = grossPay;
 
       const paymentData = {
-        worker: assignment.worker,
-        pitak: assignment.pitak,
-        session: assignment.session,
-        assignment: assignment,
-        grossPay,
-        netPay,
+        workerId: assignment.worker.id,
+        pitakId: assignment.pitak.id,
+        sessionId: assignment.session.id,
+        assignmentId: assignment.id,
+        amount: grossPay,
+        grossPay: grossPay,
+        netPay: netPay,
         status: "pending",
         paymentDate: null,
         periodStart: assignment.assignmentDate,
         periodEnd: assignment.assignmentDate,
         notes: `Auto-generated from completed assignment #${assignment.id}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       };
+
+      console.log(paymentData);
 
       const savedPayment = await paymentService.create(paymentData, user, qr);
 
