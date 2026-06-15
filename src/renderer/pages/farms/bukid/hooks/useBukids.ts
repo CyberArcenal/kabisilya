@@ -5,6 +5,7 @@ import { useModal } from "../../../../hooks/useModal";
 import { dialogs } from "../../../../utils/dialogs";
 import bukidAPI, { type Bukid } from "../../../../api/core/bukid";
 import pitakAPI, { type Pitak } from "../../../../api/core/pitak";
+import { showError } from "../../../../utils/notification";
 
 export interface BukidWithPitaks extends Bukid {
   pitaks?: Pitak[];
@@ -367,9 +368,18 @@ export const useBukids = () => {
 
   const handleConfirmStatusChange = async (newStatus: string) => {
     if (!statusChangeBukid) return;
-    await bukidAPI.updateStatus(statusChangeBukid.id, newStatus);
-    await fetchBukids();
-    setStatusChangeBukid(null);
+    try {
+      const result = await bukidAPI.updateStatus(
+        statusChangeBukid.id,
+        newStatus,
+      );
+
+      await fetchBukids();
+      setStatusChangeBukid(null);
+    } catch (err: any) {
+      showError(err.message);
+      setStatusChangeBukid(null);
+    }
   };
 
   // Bulk actions

@@ -7,6 +7,7 @@ import type { AssignmentWithDetails, AssignmentFormData } from "../types";
 import assignmentAPI, {
   type AssignmentStats,
 } from "../../../../api/core/assignment";
+import { showError } from "../../../../utils/notification";
 
 const DEBOUNCE_MS = 300;
 
@@ -356,7 +357,19 @@ export const useAssignments = () => {
         setLoading(false);
       }
     }
-  }, [page, limit, sortBy, sortOrder, search, workerId, pitakId, sessionId, status, startDate, endDate]);
+  }, [
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+    search,
+    workerId,
+    pitakId,
+    sessionId,
+    status,
+    startDate,
+    endDate,
+  ]);
 
   useEffect(() => {
     fetchAssignments();
@@ -419,9 +432,13 @@ export const useAssignments = () => {
 
   const handleConfirmStatusChange = async (newStatus: string) => {
     if (!statusChangeAssignment) return;
-    await assignmentAPI.updateStatus(statusChangeAssignment.id, newStatus);
-    await fetchAssignments();
-    setStatusChangeAssignment(null);
+    try {
+      await assignmentAPI.updateStatus(statusChangeAssignment.id, newStatus);
+      await fetchAssignments();
+      setStatusChangeAssignment(null);
+    } catch (err: any) {
+      showError(err.message);
+    }
   };
 
   const fetchStats = useCallback(async () => {

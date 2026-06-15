@@ -38,7 +38,7 @@ class SessionStateTransitionService {
     const settingKey = "default_session_id";
     const settingType = SettingType.FARM_SESSION;
     let defaultSetting = await settingRepo.findOne({
-      where: { key: settingKey, setting_type: settingType, deletedAt: null },
+      where: { key: settingKey, setting_type: settingType},
     });
 
     if (defaultSetting) {

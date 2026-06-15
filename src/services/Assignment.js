@@ -100,7 +100,7 @@ class AssignmentService {
       const session = await sessionRepo.findOne({
         where: { id: data.sessionId },
       });
-      
+
       if (!session)
         throw new Error(`Session with ID ${data.sessionId} not found`);
 
@@ -217,7 +217,7 @@ class AssignmentService {
 
     const assignment = await assignmentRepo.findOne({
       where: { id, deletedAt: null },
-      relations: ["session"],
+      relations: ["worker", "pitak", "session"],
     });
     if (!assignment) throw new Error(`Assignment with ID ${id} not found`);
     if (assignment.session.status !== "active") {
@@ -246,6 +246,12 @@ class AssignmentService {
     if (!allowedTransitions[oldStatus]?.includes(newStatus)) {
       throw new Error(
         `Invalid status transition from ${oldStatus} to ${newStatus}`,
+      );
+    }
+
+    if (newStatus === AssignmentStatus.COMPLETED && !assignment.worker) {
+      throw new Error(
+        `Cannot complete assignment #${assignment.id} because no worker is assigned. Please assign a worker first.`,
       );
     }
 

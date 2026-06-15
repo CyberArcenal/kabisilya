@@ -5,6 +5,7 @@ import { useModal } from "../../../../hooks/useModal";
 import { dialogs } from "../../../../utils/dialogs";
 import type { SessionWithDetails, SessionFormData } from "../types";
 import sessionAPI from "../../../../api/core/session";
+import { showError } from "../../../../utils/notification";
 
 const DEBOUNCE_MS = 300;
 
@@ -234,7 +235,8 @@ export const useSessions = () => {
     try {
       await sessionAPI.updateStatus(id, "active");
       await fetchSessions();
-    } catch (error) {
+    } catch (error:any) {
+      showError(error.message);
       console.error("Failed to set session active", error);
     }
   };
@@ -276,9 +278,13 @@ export const useSessions = () => {
 
   const handleConfirmStatusChange = async (newStatus: string) => {
     if (!statusChangeSession) return;
+    try{
     await sessionAPI.updateStatus(statusChangeSession.id, newStatus);
     await fetchSessions();
     setStatusChangeSession(null);
+    }catch(err:any){
+      showError(err.message);
+    }
   };
 
   // Bulk actions

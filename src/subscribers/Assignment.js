@@ -29,6 +29,7 @@ class AssignmentSubscriber {
       await this.transitionService.onInitiated(hydrated, null, "system", queryRunner);
     } catch (err) {
       logger.error("[AssignmentSubscriber] afterInsert error", err);
+      throw err;
     }
   }
 
@@ -68,6 +69,7 @@ class AssignmentSubscriber {
       }
     } catch (err) {
       logger.error("[AssignmentSubscriber] afterUpdate error", err);
+         throw err;
     }
   }
 
@@ -85,6 +87,7 @@ class AssignmentSubscriber {
       }
     } catch (err) {
       logger.error("[AssignmentSubscriber] afterRemove error", err);
+         throw err;
     }
   }
 

@@ -4,6 +4,7 @@
 const auditLogger = require("../utils/auditLogger");
 const { farmSessionDefaultSessionId } = require("../utils/settings/system");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
+const { logger } = require("../utils/logger");
 
 class PitakService {
   constructor() {
@@ -224,7 +225,7 @@ class PitakService {
 
     const pitak = await pitakRepo.findOne({
       where: { id, deletedAt: null },
-      relations: ["bukid", "bukid.session"],
+      relations: ["bukid", "bukid.session", "assignments"],
     });
     if (!pitak) throw new Error(`Pitak with ID ${id} not found`);
 
@@ -247,6 +248,17 @@ class PitakService {
         `Cannot change status of pitak "${pitak.location}" because its farm's session (${pitak.bukid.session.name}) is not active. Only active sessions allow modifications.`,
       );
     }
+
+    if (
+      (newStatus === "completed" && !pitak.assignments) ||
+      pitak.assignments.length === 0
+    ) {
+      logger.info(
+        `[PitakTransition] Pitak #${pitak.id} has no assignments, cannot complete.`,
+      );
+      throw new Error(`Pitak  has no assignments, cannot complete.`);
+    }
+
     pitak.status = newStatus;
     pitak.updatedAt = new Date();
 
@@ -467,7 +479,7 @@ class PitakService {
     const sortMap = {
       location: "pitak.location",
       "bukid.name": "bukid.name",
-      area: "pitak.area",
+      area: "pitak.totalLuwang",
       status: "pitak.status",
       createdAt: "pitak.createdAt",
     };
@@ -511,11 +523,14 @@ class PitakService {
       .andWhere("pitak.status = :status", { status: "cancelled" })
       .getCount();
 
-    const totalAreaSum = await qb
-      .clone()
-      .select("SUM(pitak.area)", "sum")
-      .getRawOne();
-    const totalArea = parseFloat(totalAreaSum.sum) || 0;
+    let totalArea = 0;
+    try {
+      const totalAreaResult = await qb
+        .clone()
+        .select("SUM(pitak.totalLuwang)", "totalArea")
+        .getRawOne();
+      totalArea = parseFloat(totalAreaResult.totalArea) || 0;
+    } catch (err) {}
 
     return {
       total,
@@ -527,48 +542,52 @@ class PitakService {
   }
 
   async getStatisticsWithFilters(options = {}) {
-    const { pitak: repo } = await this.getRepositories();
-    const qb = repo
-      .createQueryBuilder("pitak")
-      .leftJoin("pitak.bukid", "bukid")
-      .leftJoin("bukid.session", "session")
-      .where("pitak.deletedAt IS NULL");
+   const { pitak: repo } = await this.getRepositories();
+  const qb = repo
+    .createQueryBuilder("pitak")
+    .leftJoin("pitak.bukid", "bukid")
+    .leftJoin("bukid.session", "session")
+    .where("pitak.deletedAt IS NULL");
 
-    if (options.sessionId) {
-      qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
-    }
-    if (options.bukidId) {
-      qb.andWhere("bukid.id = :bukidId", { bukidId: options.bukidId });
-    }
-    if (options.status) {
-      qb.andWhere("pitak.status = :status", { status: options.status });
-    }
-    if (options.search) {
-      qb.andWhere(
-        "(pitak.location LIKE :search OR pitak.description LIKE :search)",
-        {
-          search: `%${options.search}%`,
-        },
-      );
-    }
+  console.log("Options passed:", JSON.stringify(options));
 
-    const total = await qb.getCount();
+  if (options.sessionId) {
+    qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
+  }
+  if (options.bukidId) {
+    qb.andWhere("bukid.id = :bukidId", { bukidId: options.bukidId });
+  }
+  if (options.status) {
+    qb.andWhere("pitak.status = :status", { status: options.status });
+  }
+  if (options.search) {
+    qb.andWhere("(pitak.location LIKE :search OR pitak.description LIKE :search)", {
+      search: `%${options.search}%`,
+    });
+  }
+
+  const total = await qb.getCount();
+  console.log("Total pitaks after filters:", total);
     const statusCounts = await qb
       .clone()
       .select("pitak.status", "status")
       .addSelect("COUNT(pitak.id)", "count")
       .groupBy("pitak.status")
       .getRawMany();
+
     const breakdown = statusCounts.reduce((acc, row) => {
       acc[row.status] = parseInt(row.count, 10);
       return acc;
     }, {});
 
-    const totalAreaResult = await qb
-      .clone()
-      .select("SUM(pitak.area)", "totalArea")
-      .getRawOne();
-    const totalArea = parseFloat(totalAreaResult.totalArea) || 0;
+    let totalArea = 0;
+    try {
+      const totalAreaResult = await qb
+        .clone()
+        .select("SUM(pitak.totalLuwang)", "totalArea")
+        .getRawOne();
+      totalArea = parseFloat(totalAreaResult.totalArea) || 0;
+    } catch (err) {}
 
     // For total assigned workers, we need a separate query (join assignments)
     // Optional: compute from frontend for now.

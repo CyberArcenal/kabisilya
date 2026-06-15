@@ -116,10 +116,10 @@ class PitakAPI {
     return this.getAll({ ...params, bukidId });
   }
 
-  async getStats(bukidId?: number): Promise<PitakStatsResponse> {
+  async getStats(params?: PitakFilters): Promise<PitakStatsResponse> {
     try {
       const response = await this.call<PitakStatsResponse>("getPitakStats", {
-        bukidId,
+        ...params
       });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");

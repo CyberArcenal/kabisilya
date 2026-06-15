@@ -17,6 +17,7 @@ import { NotificationsDropdown } from "./NotificationsDropdown";
 import UpdateNotifier from "../../../components/Shared/UpdateNotifier";
 import ThemeToggle from "../../../components/Shared/ThemeToggle";
 import StatusIndicators from "../../../components/Shared/StatusIndicators";
+import Button from "../../../components/UI/Button";
 
 const TopBarRight: React.FC = () => {
   const navigate = useNavigate();
@@ -68,8 +69,7 @@ const TopBarRight: React.FC = () => {
 
   // Manual session refresh (if needed, can be passed as prop from parent)
   const handleRefreshSession = () => {
-    // This could trigger a global event to refetch session info
-    window.dispatchEvent(new CustomEvent("refresh-session"));
+    window.location.reload();
   };
 
   return (
@@ -186,13 +186,14 @@ const TopBarRight: React.FC = () => {
       </div>
 
       {/* Refresh Session Button */}
-      <button
+      <Button
         onClick={handleRefreshSession}
+        variant="secondary"
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--accent-green)] text-[var(--sidebar-text)] border-none"
       >
         <RefreshCw className="w-4 h-4" />
         <span className="hidden md:inline text-sm">Refresh</span>
-      </button>
+      </Button>
 
       <UpdateNotifier />
       <ThemeToggle/>

@@ -3,10 +3,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useModal } from "../../../../hooks/useModal";
 import { dialogs } from "../../../../utils/dialogs";
-import type { PitakWithWorkers, PitakFormData } from "../types";
-import pitakAPI from "../../../../api/core/pitak";
+import type { PitakWithWorkers } from "../types";
+import pitakAPI, { type PitakCreateData } from "../../../../api/core/pitak";
 import assignmentAPI from "../../../../api/core/assignment";
 import type { Worker } from "../../../../api/core/worker";
+import { showError } from "../../../../utils/notification";
 
 const DEBOUNCE_MS = 300;
 
@@ -65,7 +66,7 @@ export const usePitaks = () => {
     null,
   );
   const [editingPitak, setEditingPitak] = useState<
-    (PitakFormData & { id: number }) | null
+    (PitakCreateData & { id: number }) | null
   >(null);
   const [statusChangePitak, setStatusChangePitak] =
     useState<PitakWithWorkers | null>(null);
@@ -326,6 +327,7 @@ export const usePitaks = () => {
       if (sessionId) params.sessionId = sessionId;
       if (search) params.search = search;
       const res = await pitakAPI.getStats(params); // requires backend implementation
+      console.log(res)
       if (res.status && res.data) {
         setStats({
           totalPlots: res.data.total,
@@ -342,7 +344,7 @@ export const usePitaks = () => {
 
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+  }, []);
 
   // CRUD handlers (unchanged)
   const handleDelete = async (id: number) => {
@@ -398,9 +400,13 @@ export const usePitaks = () => {
 
   const handleConfirmStatusChange = async (newStatus: string) => {
     if (!statusChangePitak) return;
-    await pitakAPI.updateStatus(statusChangePitak.id, newStatus as any);
-    await fetchPitaks();
-    setStatusChangePitak(null);
+    try {
+      await pitakAPI.updateStatus(statusChangePitak.id, newStatus as any);
+      await fetchPitaks();
+      setStatusChangePitak(null);
+    } catch (err: any) {
+      showError(err.message);
+    }
   };
 
   // Bulk actions
@@ -530,11 +536,11 @@ export const usePitaks = () => {
     formModal,
     statusChangePitak,
     statusModal,
-     selectedIds,
-  setSelectedIds,
-  bulkDelete,
-  bulkStatusChange,
-  bulkExport,
+    selectedIds,
+    setSelectedIds,
+    bulkDelete,
+    bulkStatusChange,
+    bulkExport,
     setPage,
     setLimit,
     setSort,

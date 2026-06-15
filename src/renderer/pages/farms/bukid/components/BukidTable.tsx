@@ -214,7 +214,7 @@ const BukidTable: React.FC<BukidTableProps> = ({
                     {bukid.location || "—"}
                   </td>
                   <td className="py-2.5 px-4 text-[var(--text-secondary)]">
-                    {bukid.area ?? "—"}
+                    {bukid.area?.toFixed(2) ?? "—"}
                   </td>
                   <td className="py-2.5 px-4">
                     <span className={getStatusBadge(bukid.status)}>

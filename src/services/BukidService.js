@@ -231,7 +231,7 @@ class BukidService {
         where: { id, deletedAt: null },
         relations: ["session"],
       });
-      
+
       if (!bukid) throw new Error(`Bukid with ID ${id} not found`);
       if (bukid.deletedAt) throw new Error(`Bukid #${id} is already deleted`);
       if (bukid.session.status !== "active") {
@@ -413,7 +413,7 @@ class BukidService {
     const sortMap = {
       name: "bukid.name",
       status: "bukid.status",
-      area: "bukid.area",
+      // area: "bukid.area",
       createdAt: "bukid.createdAt",
       "session.name": "session.name",
     };
@@ -441,6 +441,7 @@ class BukidService {
     const { bukid: repo } = await this.getRepositories();
     const qb = repo
       .createQueryBuilder("bukid")
+      .leftJoin("bukid.pitaks", "pitaks")
       .where("bukid.deletedAt IS NULL");
 
     const total = await qb.getCount();
@@ -462,11 +463,17 @@ class BukidService {
       .getCount();
 
     // Sum of area (if numeric)
-    const totalAreaResult = await qb
-      .clone()
-      .select("SUM(bukid.area)", "sum")
-      .getRawOne();
-    const totalArea = parseFloat(totalAreaResult.sum) || 0;
+    let totalArea = 0;
+    try {
+      const totalLuwangResult = await qb
+        .clone()
+        .leftJoin("bukid.pitaks", "pitak")
+        .select("SUM(pitak.totalLuwang)", "sum")
+        .getRawOne();
+      totalArea = parseFloat(totalLuwangResult?.sum) || 0;
+    } catch (err) {
+      // ignore if column doesn't exist yet
+    }
 
     return {
       total,
@@ -488,6 +495,7 @@ class BukidService {
     const qb = repo
       .createQueryBuilder("bukid")
       .leftJoin("bukid.session", "session")
+      .leftJoin("bukid.pitaks", "pitaks")
       .where("bukid.deletedAt IS NULL");
 
     // Apply filters
@@ -523,11 +531,14 @@ class BukidService {
     }, {});
 
     // Get total area (sum of area)
-    const totalAreaResult = await qb
-      .clone()
-      .select("SUM(bukid.area)", "totalArea")
-      .getRawOne();
-    const totalArea = parseFloat(totalAreaResult.totalArea) || 0;
+    let totalArea = 0;
+    try {
+      const totalLuwangResult = await qb
+        .clone()
+        .select("SUM(pitaks.totalLuwang)", "totalArea")
+        .getRawOne();
+      totalArea = parseFloat(totalLuwangResult?.totalArea) || 0;
+    } catch (err) {}
 
     // Get total pitaks (sum of pitaks across filtered bukids) – requires joining pitaks
     // This is optional; if you want total pitaks count for summary cards, uncomment:

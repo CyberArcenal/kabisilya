@@ -142,7 +142,7 @@ class AssignmentAPI {
     try {
       const response = await this.call<AssignmentStatsResponse>(
         "getAssignmentStats",
-        { filters },
+        { ...filters },
       );
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
