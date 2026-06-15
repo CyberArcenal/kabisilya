@@ -3,6 +3,7 @@
 //@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
+const { farmSessionDefaultSessionId } = require("../utils/settings/system");
 
 class PaymentService {
   constructor() {
@@ -928,7 +929,180 @@ class PaymentService {
 
     return payment;
   }
+
+  /**
+   * Record a bulk payment for a worker (one transaction covering debt deduction and multiple payments)
+   * @param {number} workerId
+   * @param {number} totalAmount - Total cash given to worker
+   * @param {number} debtDeduction - Portion to apply to outstanding debts
+   * @param {string} paymentMethod
+   * @param {string|null} referenceNumber
+   * @param {string|null} notes
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @returns {Promise<Object>}
+   */
+  async recordWorkerPayment(
+    workerId,
+    totalAmount,
+    debtDeduction,
+    paymentMethod,
+    referenceNumber,
+    notes,
+    user = "system",
+    qr = null,
+  ) {
+    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
+    const { In } = require("typeorm");
+    const Payment = require("../entities/Payment");
+    const PaymentHistory = require("../entities/PaymentHistory");
+    const debtService = require("./DebtService");
+
+    const paymentRepo = this._getRepo(qr, Payment);
+    const historyRepo = this._getRepo(qr, PaymentHistory);
+
+    // 1. Basic validation
+    if (totalAmount <= 0)
+      throw new Error("Total amount must be greater than zero");
+    if (debtDeduction < 0) throw new Error("Debt deduction cannot be negative");
+    if (debtDeduction > totalAmount)
+      throw new Error("Debt deduction cannot exceed total amount");
+
+    // Round totalAmount to 2 decimals
+    const roundedTotal = roundToTwo(totalAmount);
+    const roundedDeduction = roundToTwo(debtDeduction);
+
+    // 2. Get total outstanding debt balance for this worker (no session filter)
+    const debtStats = await debtService.getStatisticsWithFilters({ workerId });
+    const totalDebtBalance = roundToTwo(debtStats.totalBalance || 0);
+
+    // 3. Get total pending payments (ALL payments, no session filter)
+    const pendingPaymentsList = await paymentRepo.find({
+      where: {
+        worker: { id: workerId },
+        status: In(["pending", "partially_paid"]),
+        deletedAt: null,
+      },
+      order: { paymentDate: "ASC", createdAt: "ASC" },
+    });
+    const rawPaymentsDue = pendingPaymentsList.reduce(
+      (sum, p) => sum + (p.netPay - (p.amountPaid || 0)),
+      0,
+    );
+    const totalPaymentsDue = roundToTwo(rawPaymentsDue);
+    const totalDue = roundToTwo(totalPaymentsDue + totalDebtBalance);
+
+    if (roundedTotal > totalDue) {
+      throw new Error(
+        `Total amount (${roundedTotal}) exceeds total due (${totalDue}). ` +
+          `Outstanding debt: ${totalDebtBalance}, Payments due: ${totalPaymentsDue}`,
+      );
+    }
+
+    // 4. Apply debt deduction (no sessionId)
+    let actualDebtDeducted = 0;
+    if (roundedDeduction > 0) {
+      actualDebtDeducted = await debtService.deductFromWorker(
+        workerId,
+        roundedDeduction,
+        null,
+        null, // sessionId = null – ignore session
+        user,
+        qr,
+      );
+      if (actualDebtDeducted < roundedDeduction) {
+        throw new Error(
+          `Only ${actualDebtDeducted} of ${roundedDeduction} debt could be deducted. Insufficient debt balance.`,
+        );
+      }
+    }
+
+    // 5. Remaining amount for payments
+    let remainingForPayments = roundToTwo(roundedTotal - actualDebtDeducted);
+    if (remainingForPayments < 0) remainingForPayments = 0;
+
+    if (remainingForPayments === 0) {
+      return {
+        success: true,
+        totalAmount: roundedTotal,
+        debtDeducted: actualDebtDeducted,
+        paymentsUpdated: 0,
+        remainingUnallocated: 0,
+      };
+    }
+
+    if (pendingPaymentsList.length === 0) {
+      throw new Error(
+        "No pending payments found for this worker, but remaining amount is non-zero.",
+      );
+    }
+
+    // 6. Distribute remainingForPayments across payments (FIFO)
+    let remaining = remainingForPayments;
+    const updates = [];
+    for (const payment of pendingPaymentsList) {
+      if (remaining <= 0) break;
+      const due = payment.netPay - (payment.amountPaid || 0);
+      if (due <= 0) continue;
+      const payAmount = Math.min(remaining, due);
+      updates.push({ payment, amount: roundToTwo(payAmount) });
+      remaining = roundToTwo(remaining - payAmount);
+    }
+
+    if (updates.length === 0) {
+      throw new Error("No payments needed updating (all already paid?)");
+    }
+
+    // 7. Update each payment and create history
+    for (const { payment, amount } of updates) {
+      const oldAmountPaid = roundToTwo(payment.amountPaid || 0);
+      const newAmountPaid = roundToTwo(oldAmountPaid + amount);
+
+      payment.amountPaid = newAmountPaid;
+      payment.lastPaymentDate = new Date();
+      payment.netPay = roundToTwo(payment.netPay);
+      const newStatus =
+        newAmountPaid >= payment.netPay ? "completed" : "partially_paid";
+      payment.status = newStatus;
+      payment.updatedAt = new Date();
+
+      await updateDb(paymentRepo, payment, {
+        queryRunner: qr,
+        skipSignal: false,
+      });
+
+      const history = historyRepo.create({
+        payment,
+        actionType: "payment_recorded",
+        changedField: "amountPaid",
+        oldValue: oldAmountPaid.toString(),
+        newValue: newAmountPaid.toString(),
+        oldAmount: oldAmountPaid,
+        newAmount: newAmountPaid,
+        notes: `Part of bulk worker payment. Total: ${roundedTotal}, debt deducted: ${actualDebtDeducted}. ${notes || ""}`,
+        performedBy: user,
+        referenceNumber: referenceNumber,
+      });
+      await saveDb(historyRepo, history, { queryRunner: qr });
+      await auditLogger.logCreate("PaymentHistory", history.id, history, user);
+    }
+
+    return {
+      success: true,
+      totalAmount: roundedTotal,
+      debtDeducted: actualDebtDeducted,
+      paymentsUpdated: updates.length,
+      remainingUnallocated: remaining,
+      totalPaymentsDue,
+      totalDebtBalance,
+    };
+  }
 }
+
+const roundToTwo = (num) => {
+  if (num === undefined || num === null) return 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+};
 
 // Singleton instance
 const paymentService = new PaymentService();

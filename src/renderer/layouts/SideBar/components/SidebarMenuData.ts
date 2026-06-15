@@ -1,9 +1,12 @@
 // src/layouts/components/SidebarMenuData.ts
 import {
   LayoutDashboard,
-  Users, Settings,
-  Bell, ClipboardList,
-  DollarSign, CalendarDays,
+  Users,
+  Settings,
+  Bell,
+  ClipboardList,
+  DollarSign,
+  CalendarDays,
   ScrollText,
   Sprout,
   LineChart,
@@ -18,7 +21,7 @@ import {
   Scroll,
   Trees,
   Users2,
-  Map
+  Map,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -66,10 +69,16 @@ export const menuItems: MenuItem[] = [
     category: "core",
     children: [
       {
-        path: "/finance/worker/payments",
+        path: "/finance/worker-payment-summary",
         name: "Worker Payments",
         icon: HandCoins,
       },
+      {
+        path: "/finance/worker/payments",
+        name: "Payments",
+        icon: HandCoins,
+      },
+
       // { path: "/finance/payments", name: "Payments", icon: Banknote },
       { path: "/finance/debts", name: "Debt Management", icon: Receipt },
       {

@@ -4,6 +4,7 @@ import "./styles/App.css";
 import "./styles/App-dark.css";
 import "./styles/scrollbar.css";
 import "./styles/animation.css";
+import "./styles/dashboard.css";
 import "reflect-metadata";
 import React from "react";
 import ConditionalRouter from "./components/Shared/ConditionalRouter";

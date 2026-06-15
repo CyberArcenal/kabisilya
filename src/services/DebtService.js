@@ -659,9 +659,9 @@ class DebtService {
       if (deductAmount <= 0) continue;
 
       const oldBalance = debt.balance;
-      debt.balance -= deductAmount;
-      remaining -= deductAmount;
-      totalDeducted += deductAmount;
+      debt.balance = parseFloat((debt.balance - deductAmount).toFixed(2));
+      remaining = parseFloat((remaining - deductAmount).toFixed(2));
+      totalDeducted = parseFloat((totalDeducted + deductAmount).toFixed(2));
 
       // Update debt status
       if (debt.balance === 0) {
@@ -677,8 +677,8 @@ class DebtService {
       const history = historyRepo.create({
         debt,
         payment,
-        amountPaid: deductAmount,
-        previousBalance: oldBalance,
+        amountPaid: parseFloat(deductAmount.toFixed(2)),
+        previousBalance: parseFloat(oldBalance.toFixed(2)),
         newBalance: debt.balance,
         transactionType: "payment",
         notes: `Payment #${paymentId} deducted from debt`,

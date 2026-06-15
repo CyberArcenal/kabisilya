@@ -159,15 +159,18 @@ class PaymentAPI {
     return this.getAll({ ...params, sessionId });
   }
 
-async getStats(filters?: PaymentFilters): Promise<PaymentStatsResponse> {
-  try {
-    const response = await this.call<PaymentStatsResponse>("getPaymentStats", filters || {});
-    if (response.status) return response;
-    throw new Error(response.message || "Failed to fetch stats");
-  } catch (error: any) {
-    throw new Error(error.message || "Failed to fetch stats");
+  async getStats(filters?: PaymentFilters): Promise<PaymentStatsResponse> {
+    try {
+      const response = await this.call<PaymentStatsResponse>(
+        "getPaymentStats",
+        filters || {},
+      );
+      if (response.status) return response;
+      throw new Error(response.message || "Failed to fetch stats");
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to fetch stats");
+    }
   }
-}
 
   async create(data: PaymentCreateData): Promise<PaymentResponse> {
     try {
@@ -260,6 +263,17 @@ async getStats(filters?: PaymentFilters): Promise<PaymentStatsResponse> {
     } catch (error: any) {
       throw new Error(error.message || "Failed to record payment");
     }
+  }
+
+  async recordWorkerPayment(params: {
+    workerId: number;
+    totalAmount: number;
+    debtDeduction: number;
+    paymentMethod: string;
+    referenceNumber?: string;
+    notes?: string;
+  }): Promise<ApiResponse<any>> {
+    return this.call("recordWorkerPayment", params);
   }
 }
 

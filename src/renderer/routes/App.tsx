@@ -24,6 +24,7 @@ import WorkerPerformancePage from "../pages/reports/workers";
 import SessionsPage from "../pages/system/sessions";
 import ReminderLogPage from "../pages/reminder";
 import FarmManagementSettingsPage from "../pages/system/Settings";
+import WorkerPaymentSummaryPage from "../pages/finance/worker-payment-summary";
 
 function App() {
   const [licenseAccepted, setLicenseAccepted] = useState(false);
@@ -82,6 +83,10 @@ function App() {
           element={<WorkerPaymentsPage />}
         />
         <Route path="/finance/payments" element={<WorkerPaymentsPage />} />
+        <Route
+          path="/finance/worker-payment-summary"
+          element={<WorkerPaymentSummaryPage />}
+        />
         <Route path="/finance/debts" element={<DebtsPage />} />
         <Route
           path="/finance/payment/history"
@@ -94,12 +99,11 @@ function App() {
         <Route path="/analytics/pitak" element={<PitakProductivityPage />} />
         <Route path="/analytics/workers" element={<WorkerPerformancePage />} />
 
-        <Route path="/system/sessions" element={<SessionsPage/>}/>
+        <Route path="/system/sessions" element={<SessionsPage />} />
 
-        
         {/* Notifications & Logs */}
         <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/reminders" element={<ReminderLogPage/>}/>
+        <Route path="/reminders" element={<ReminderLogPage />} />
 
         {/* System */}
         <Route path="/audit" element={<AuditPage />} />
