@@ -38,7 +38,7 @@
     "publish": {
       "provider": "github",
       "owner": "CyberArcenal",
-      "repo": "Planting-Worker-Management",
+      "repo": "kabisilya",
       "releaseType": "release"
     }
   },

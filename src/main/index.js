@@ -248,8 +248,8 @@ async function safeCloseDatabase() {
 function getIconPath() {
   const platform = process.platform;
   const iconDir = APP_CONFIG.isDev
-    ? path.resolve(__dirname, "..", "..", "build")
-    : path.join(process.resourcesPath, "build");
+    ? path.resolve(__dirname, "..", "..", "icons")
+    : path.join(process.resourcesPath, "icons");
   const iconMap = { win32: "icon.ico", darwin: "icon.icns", linux: "icon.png" };
   // @ts-ignore
   const iconFile = iconMap[platform] || "icon.png";
