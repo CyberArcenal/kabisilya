@@ -20,8 +20,10 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ item, children }) => {
       notes: item.notes,
       referenceNumber: item.referenceNumber,
       paymentMethod: item.paymentMethod,
-      paymentId: item.payment?.id,
       debtId: item.debt?.id,
+      worker: item.debt?.worker?.name,
+      session: item.debt?.session?.name,
+      createdAt: item.createdAt,
     };
     return JSON.stringify(details, null, 2);
   };
@@ -33,7 +35,7 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ item, children }) => {
         <td className="py-2.5 px-4 text-center">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-1 rounded hover:bg-[var(--card-hover-bg)]"
+            className="p-1 rounded hover:bg-[var(--card-hover-bg)] transition-colors"
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -53,7 +55,7 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ item, children }) => {
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
-              <pre className="text-xs bg-[var(--card-bg)] p-2 rounded overflow-x-auto">
+              <pre className="text-xs bg-[var(--card-bg)] p-2 rounded overflow-x-auto border border-[var(--border-color)]">
                 {renderDetails()}
               </pre>
             </div>

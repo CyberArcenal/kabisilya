@@ -3,21 +3,23 @@
 // Refactored to follow the same structure as AssignmentService, BukidService, etc.
 
 const { In } = require("typeorm");
-const auditLogger = require("../utils/auditLogger");
-const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
+const auditLogger = require("../../utils/auditLogger");
+const { paginateQueryBuilder } = require("../../utils/dbUtils/pagination");
 
 class DebtService {
   constructor() {
     this.debtRepository = null;
     this.workerRepository = null;
     this.sessionRepository = null;
+    this.debtPaymentService = null;
   }
 
   async initialize() {
-    const { AppDataSource } = require("../main/db/data-source");
-    const Debt = require("../entities/Debt");
-    const Worker = require("../entities/Worker");
-    const Session = require("../entities/Session");
+    const { AppDataSource } = require("../../main/db/data-source");
+    const Debt = require("../../entities/Debt");
+    const Worker = require("../../entities/Worker");
+    const Session = require("../../entities/Session");
+    const DebtPaymentService = require("../DebtPayment"); // ✅ idagdag ito
 
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
@@ -25,6 +27,7 @@ class DebtService {
     this.debtRepository = AppDataSource.getRepository(Debt);
     this.workerRepository = AppDataSource.getRepository(Worker);
     this.sessionRepository = AppDataSource.getRepository(Session);
+    this.debtPaymentService = DebtPaymentService; // ✅ idagdag ito
     console.log("DebtService initialized");
   }
 
@@ -56,7 +59,7 @@ class DebtService {
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
     }
-    const { AppDataSource } = require("../main/db/data-source");
+    const { AppDataSource } = require("../../main/db/data-source");
     console.log(`[Debt._getRepo] Using global repository (fallback)`);
     return AppDataSource.getRepository(entityClass);
   }
@@ -68,10 +71,10 @@ class DebtService {
    * @param {import("typeorm").QueryRunner | null} qr
    */
   async create(data, user = "system", qr = null) {
-    const { saveDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
-    const Worker = require("../entities/Worker");
-    const Session = require("../entities/Session");
+    const { saveDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
+    const Worker = require("../../entities/Worker");
+    const Session = require("../../entities/Session");
 
     const debtRepo = this._getRepo(qr, Debt);
     const workerRepo = this._getRepo(qr, Worker);
@@ -122,10 +125,10 @@ class DebtService {
    * @param {import("typeorm").QueryRunner | null} qr
    */
   async update(id, data, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
-    const Worker = require("../entities/Worker");
-    const Session = require("../entities/Session");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
+    const Worker = require("../../entities/Worker");
+    const Session = require("../../entities/Session");
 
     const debtRepo = this._getRepo(qr, Debt);
     const workerRepo = this._getRepo(qr, Worker);
@@ -182,8 +185,8 @@ class DebtService {
    * @param {import("typeorm").QueryRunner | null} qr
    */
   async updateStatus(id, newStatus, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
     const debtRepo = this._getRepo(qr, Debt);
 
     const debt = await debtRepo.findOne({ where: { id, deletedAt: null } });
@@ -234,8 +237,8 @@ class DebtService {
    * @param {import("typeorm").QueryRunner | null} qr
    */
   async delete(id, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
     const debtRepo = this._getRepo(qr, Debt);
 
     try {
@@ -264,8 +267,8 @@ class DebtService {
    * @param {import("typeorm").QueryRunner | null} qr
    */
   async restore(id, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
     const debtRepo = this._getRepo(qr, Debt);
 
     try {
@@ -299,8 +302,8 @@ class DebtService {
    * @param {import("typeorm").QueryRunner | null} qr
    */
   async permanentlyDelete(id, user = "system", qr = null) {
-    const { removeDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
+    const { removeDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
     const debtRepo = this._getRepo(qr, Debt);
 
     const debt = await debtRepo.findOne({ where: { id }, withDeleted: true });
@@ -324,6 +327,7 @@ class DebtService {
       .leftJoinAndSelect("debt.worker", "worker")
       .leftJoinAndSelect("debt.session", "session")
       .leftJoinAndSelect("debt.history", "history")
+      .leftJoinAndSelect("debt.debtPayments", "debtPayments")
       .where("debt.id = :id", { id });
 
     if (!includeDeleted) {
@@ -347,7 +351,8 @@ class DebtService {
     const qb = repo
       .createQueryBuilder("debt")
       .leftJoinAndSelect("debt.worker", "worker")
-      .leftJoinAndSelect("debt.session", "session");
+      .leftJoinAndSelect("debt.session", "session")
+      .leftJoinAndSelect("debt.debtPayments", "debtPayments");
 
     // Exclude soft-deleted unless requested
     if (!options.includeDeleted) {
@@ -386,7 +391,7 @@ class DebtService {
     }
     if (options.search) {
       qb.andWhere(
-        "(debt.description LIKE :search OR worker.name LIKE :search)",
+        "(debt.reason LIKE :search OR worker.name LIKE :search)",
         {
           search: `%${options.search}%`,
         },
@@ -630,16 +635,25 @@ class DebtService {
     user = "system",
     qr = null,
   ) {
-    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
-    const DebtHistory = require("../entities/DebtHistory");
-    const Payment = require("../entities/Payment");
+    const { updateDb, saveDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
+    const DebtHistory = require("../../entities/DebtHistory");
+    const Payment = require("../../entities/Payment");
 
     const debtRepo = this._getRepo(qr, Debt);
     const historyRepo = this._getRepo(qr, DebtHistory);
     const paymentRepo = this._getRepo(qr, Payment);
 
-    // Fetch active debts (pending or partially_paid), order by dueDate ASC (oldest first)
+    const payment = await paymentRepo.findOne({ where: { id: paymentId } });
+    if (!payment) {
+      throw new Error(`Payment with ID ${paymentId} not found`);
+    }
+
+    // ✅ Siguraduhing initialized ang DebtPaymentService
+    if (!this.debtPaymentService) {
+      await this.initialize();
+    }
+
     const activeDebts = await debtRepo.find({
       where: {
         worker: { id: workerId },
@@ -663,7 +677,6 @@ class DebtService {
       remaining = parseFloat((remaining - deductAmount).toFixed(2));
       totalDeducted = parseFloat((totalDeducted + deductAmount).toFixed(2));
 
-      // Update debt status
       if (debt.balance === 0) {
         debt.status = "paid";
       } else if (debt.status !== "partially_paid") {
@@ -672,11 +685,31 @@ class DebtService {
       debt.updatedAt = new Date();
       await updateDb(debtRepo, debt, { queryRunner: qr, skipSignal: true });
 
-      // Create DebtHistory entry
-      const payment = await paymentRepo.findOne({ where: { id: paymentId } });
+      // ✅ GUMAWA NG DEBTPAYMENT gamit ang DebtPaymentService
+      try {
+        await this.debtPaymentService.create(
+          {
+            paymentId: payment.id,
+            debtId: debt.id,
+            amount: parseFloat(deductAmount.toFixed(2)),
+            previousBalance: parseFloat(oldBalance.toFixed(2)),
+            newBalance: debt.balance,
+            notes: `Deducted from payment #${paymentId}`,
+          },
+          user,
+          qr,
+        );
+      } catch (err) {
+        console.error(
+          `[DebtService] Failed to create DebtPayment for debt #${debt.id}:`,
+          err,
+        );
+        throw new Error(`Failed to create DebtPayment: ${err.message}`);
+      }
+
+      // ✅ GUMAWA NG DEBTHISTORY (walang payment)
       const history = historyRepo.create({
         debt,
-        payment,
         amountPaid: parseFloat(deductAmount.toFixed(2)),
         previousBalance: parseFloat(oldBalance.toFixed(2)),
         newBalance: debt.balance,
@@ -687,6 +720,13 @@ class DebtService {
       });
       await saveDb(historyRepo, history, { queryRunner: qr });
       await auditLogger.logCreate("DebtHistory", history.id, history, user);
+    }
+
+    if (remaining > 0) {
+      console.warn(
+        `[DebtService] Only ${totalDeducted} of ${amount} deducted. ` +
+          `Remaining: ${remaining}. Worker: ${workerId}, Session: ${sessionId}`,
+      );
     }
 
     return totalDeducted;
@@ -711,9 +751,9 @@ class DebtService {
     referenceNumber = null,
     notes = null,
   ) {
-    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
-    const Debt = require("../entities/Debt");
-    const DebtHistory = require("../entities/DebtHistory");
+    const { updateDb, saveDb } = require("../../utils/dbUtils/dbActions");
+    const Debt = require("../../entities/Debt");
+    const DebtHistory = require("../../entities/DebtHistory");
     const debtRepo = this._getRepo(qr, Debt);
     const historyRepo = this._getRepo(qr, DebtHistory);
 
@@ -785,7 +825,7 @@ class DebtService {
       });
     if (options.search)
       qb.andWhere(
-        "(debt.description LIKE :search OR worker.name LIKE :search)",
+        "(debt.reason LIKE :search OR worker.name LIKE :search)",
         { search: `%${options.search}%` },
       );
 

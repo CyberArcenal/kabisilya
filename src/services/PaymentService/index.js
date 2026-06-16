@@ -1,9 +1,10 @@
-// services/PaymentService.js
-// Refactored to follow the same structure as DebtService, AssignmentService, etc.
-//@ts-check
-const auditLogger = require("../utils/auditLogger");
-const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
-const { farmSessionDefaultSessionId } = require("../utils/settings/system");
+// services/payment/index.js
+const auditLogger = require("../../utils/auditLogger");
+const { paginateQueryBuilder } = require("../../utils/dbUtils/pagination");
+const { farmSessionDefaultSessionId } = require("../../utils/settings/system");
+const { roundToTwo } = require("./utils");
+const recordWorkerPaymentFn = require("./recordWorkerPayment");
+const recordPaymentFn = require("./recordPayment");
 
 class PaymentService {
   constructor() {
@@ -15,12 +16,12 @@ class PaymentService {
   }
 
   async initialize() {
-    const { AppDataSource } = require("../main/db/data-source");
-    const Payment = require("../entities/Payment");
-    const Worker = require("../entities/Worker");
-    const Pitak = require("../entities/Pitak");
-    const Session = require("../entities/Session");
-    const Assignment = require("../entities/Assignment");
+    const { AppDataSource } = require("../../main/db/data-source");
+    const Payment = require("../../entities/Payment");
+    const Worker = require("../../entities/Worker");
+    const Pitak = require("../../entities/Pitak");
+    const Session = require("../../entities/Session");
+    const Assignment = require("../../entities/Assignment");
 
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
@@ -48,9 +49,6 @@ class PaymentService {
 
   /**
    * Helper: get repository (transactional if queryRunner provided)
-   * @param {import("typeorm").QueryRunner | null} qr
-   * @param {Function} entityClass
-   * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
     const qrType =
@@ -63,24 +61,22 @@ class PaymentService {
     if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
     }
-    const { AppDataSource } = require("../main/db/data-source");
+    const { AppDataSource } = require("../../main/db/data-source");
     console.log(`[Payment._getRepo] Using global repository (fallback)`);
     return AppDataSource.getRepository(entityClass);
   }
 
-  /**
-   * Create a new payment
-   * @param {Object} data - { workerId, pitakId, sessionId, assignmentId?, amount, paymentDate?, description?, status?, idempotencyKey? }
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
+  // ============================================================
+  // 🏗️ CORE CRUD OPERATIONS
+  // ============================================================
+
   async create(data, user = "system", qr = null) {
-    const { saveDb } = require("../utils/dbUtils/dbActions");
-    const Payment = require("../entities/Payment");
-    const Worker = require("../entities/Worker");
-    const Pitak = require("../entities/Pitak");
-    const Session = require("../entities/Session");
-    const Assignment = require("../entities/Assignment");
+    const { saveDb } = require("../../utils/dbUtils/dbActions");
+    const Payment = require("../../entities/Payment");
+    const Worker = require("../../entities/Worker");
+    const Pitak = require("../../entities/Pitak");
+    const Session = require("../../entities/Session");
+    const Assignment = require("../../entities/Assignment");
 
     const paymentRepo = this._getRepo(qr, Payment);
     const workerRepo = this._getRepo(qr, Worker);
@@ -119,7 +115,7 @@ class PaymentService {
           throw new Error(`Assignment with ID ${data.assignmentId} not found`);
       }
 
-      // Check uniqueness of (worker, pitak, session) – only one active payment per combination
+      // Check uniqueness
       const existing = await paymentRepo.findOne({
         where: {
           worker: { id: data.workerId },
@@ -134,7 +130,6 @@ class PaymentService {
         );
       }
 
-      // If assignmentId provided, ensure it's not linked to another active payment
       if (data.assignmentId) {
         const existingByAssignment = await paymentRepo.findOne({
           where: { assignment: { id: data.assignmentId }, deletedAt: null },
@@ -146,7 +141,6 @@ class PaymentService {
         }
       }
 
-      // Idempotency key uniqueness (if provided)
       if (data.idempotencyKey) {
         const existingKey = await paymentRepo.findOne({
           where: { idempotencyKey: data.idempotencyKey, deletedAt: null },
@@ -164,8 +158,8 @@ class PaymentService {
         session,
         assignment,
         amount: data.amount,
-        grossPay: data.grossPay ?? data.amount, // fallback to amount if not provided
-        netPay: data.netPay ?? data.amount, // fallback to amount if not provided
+        grossPay: data.grossPay ?? data.amount,
+        netPay: data.netPay ?? data.amount,
         paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
         description: data.description || null,
         status: data.status || "pending",
@@ -184,20 +178,13 @@ class PaymentService {
     }
   }
 
-  /**
-   * Update an existing payment
-   * @param {number} id
-   * @param {Object} data
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async update(id, data, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Payment = require("../entities/Payment");
-    const Worker = require("../entities/Worker");
-    const Pitak = require("../entities/Pitak");
-    const Session = require("../entities/Session");
-    const Assignment = require("../entities/Assignment");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Payment = require("../../entities/Payment");
+    const Worker = require("../../entities/Worker");
+    const Pitak = require("../../entities/Pitak");
+    const Session = require("../../entities/Session");
+    const Assignment = require("../../entities/Assignment");
 
     const paymentRepo = this._getRepo(qr, Payment);
     const workerRepo = this._getRepo(qr, Worker);
@@ -260,7 +247,7 @@ class PaymentService {
         data.paymentDate = new Date(data.paymentDate);
       }
 
-      // Re-check uniqueness if critical fields changed
+      // Re-check uniqueness
       if (
         (data.workerId !== undefined ||
           data.pitakId !== undefined ||
@@ -284,7 +271,6 @@ class PaymentService {
         }
       }
 
-      // If assignment changed, check its uniqueness
       if (data.assignmentId !== undefined && existing.assignment) {
         const duplicateAssignment = await paymentRepo.findOne({
           where: {
@@ -299,7 +285,6 @@ class PaymentService {
         }
       }
 
-      // Idempotency key uniqueness if changed
       if (
         data.idempotencyKey &&
         data.idempotencyKey !== existing.idempotencyKey
@@ -326,16 +311,9 @@ class PaymentService {
     }
   }
 
-  /**
-   * Update payment status with validation of allowed transitions
-   * @param {number} id
-   * @param {string} newStatus
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async updateStatus(id, newStatus, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Payment = require("../entities/Payment");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Payment = require("../../entities/Payment");
     const paymentRepo = this._getRepo(qr, Payment);
 
     const payment = await paymentRepo.findOne({
@@ -373,15 +351,9 @@ class PaymentService {
     return saved;
   }
 
-  /**
-   * Soft delete a payment (set deletedAt)
-   * @param {number} id
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async delete(id, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Payment = require("../entities/Payment");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Payment = require("../../entities/Payment");
     const paymentRepo = this._getRepo(qr, Payment);
 
     try {
@@ -406,15 +378,9 @@ class PaymentService {
     }
   }
 
-  /**
-   * Restore a soft-deleted payment
-   * @param {number} id
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async restore(id, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
-    const Payment = require("../entities/Payment");
+    const { updateDb } = require("../../utils/dbUtils/dbActions");
+    const Payment = require("../../entities/Payment");
     const paymentRepo = this._getRepo(qr, Payment);
 
     try {
@@ -444,15 +410,9 @@ class PaymentService {
     }
   }
 
-  /**
-   * Permanently delete a payment (hard delete) – use with caution
-   * @param {number} id
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async permanentlyDelete(id, user = "system", qr = null) {
-    const { removeDb } = require("../utils/dbUtils/dbActions");
-    const Payment = require("../entities/Payment");
+    const { removeDb } = require("../../utils/dbUtils/dbActions");
+    const Payment = require("../../entities/Payment");
     const paymentRepo = this._getRepo(qr, Payment);
 
     const payment = await paymentRepo.findOne({
@@ -466,11 +426,10 @@ class PaymentService {
     console.log(`Payment #${id} permanently deleted`);
   }
 
-  /**
-   * Find payment by ID (excludes soft-deleted by default)
-   * @param {number} id
-   * @param {boolean} includeDeleted
-   */
+  // ============================================================
+  // 🔍 READ OPERATIONS
+  // ============================================================
+
   async findById(id, includeDeleted = false) {
     const { payment: repo } = await this.getRepositories();
 
@@ -495,10 +454,6 @@ class PaymentService {
     return payment;
   }
 
-  /**
-   * Find all payments with filters, pagination, sorting
-   * @param {Object} options
-   */
   async findAll(options = {}) {
     const { payment: repo } = await this.getRepositories();
 
@@ -509,81 +464,63 @@ class PaymentService {
       .leftJoinAndSelect("payment.session", "session")
       .leftJoinAndSelect("payment.assignment", "assignment");
 
-    // Exclude soft-deleted unless requested
     if (!options.includeDeleted) {
       qb.andWhere("payment.deletedAt IS NULL");
     }
 
     // Filters
-    if (options.workerId) {
+    if (options.workerId)
       qb.andWhere("worker.id = :workerId", { workerId: options.workerId });
-    }
-    if (options.pitakId) {
+    if (options.pitakId)
       qb.andWhere("pitak.id = :pitakId", { pitakId: options.pitakId });
-    }
-    if (options.sessionId) {
+    if (options.sessionId)
       qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
-    }
-    if (options.assignmentId) {
+    if (options.assignmentId)
       qb.andWhere("assignment.id = :assignmentId", {
         assignmentId: options.assignmentId,
       });
-    }
-    if (options.status) {
+    if (options.status)
       qb.andWhere("payment.status = :status", { status: options.status });
-    }
-    if (options.startDate) {
+    if (options.startDate)
       qb.andWhere("payment.paymentDate >= :startDate", {
         startDate: new Date(options.startDate),
       });
-    }
-    if (options.endDate) {
+    if (options.endDate)
       qb.andWhere("payment.paymentDate <= :endDate", {
         endDate: new Date(options.endDate),
       });
-    }
-    if (options.minAmount) {
+    if (options.minAmount)
       qb.andWhere("payment.amount >= :minAmount", {
         minAmount: options.minAmount,
       });
-    }
-    if (options.maxAmount) {
+    if (options.maxAmount)
       qb.andWhere("payment.amount <= :maxAmount", {
         maxAmount: options.maxAmount,
       });
-    }
     if (options.search) {
       qb.andWhere(
-        "(worker.name LIKE :search OR pitak.location LIKE :search OR payment.description LIKE :search)",
+        "(worker.name LIKE :search OR pitak.location LIKE :search OR payment.notes LIKE :search)",
         { search: `%${options.search}%` },
       );
     }
-    if (options.idempotencyKey) {
+    if (options.idempotencyKey)
       qb.andWhere("payment.idempotencyKey = :key", {
         key: options.idempotencyKey,
       });
-    }
 
-    // Sorting
     const sortBy = options.sortBy || "createdAt";
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`payment.${sortBy}`, sortOrder);
 
-    // Pagination using utility
     const result = await paginateQueryBuilder(qb, {
       page: options.page,
       limit: options.limit,
     });
 
     await auditLogger.logView("Payment", null, "system");
-    return result; // { data: [], pagination: {} }
+    return result;
   }
 
-  /**
-   * Get payment statistics based on filters (same as findAll)
-   * @param {Object} options - same filter options as findAll
-   * @returns {Promise<Object>} - totals and breakdowns
-   */
   async getStatistics(options = {}) {
     const { payment: repo } = await this.getRepositories();
 
@@ -594,42 +531,34 @@ class PaymentService {
       .leftJoin("payment.session", "session")
       .where("payment.deletedAt IS NULL");
 
-    // Apply filters exactly like findAll
-    if (options.workerId) {
+    // Apply filters
+    if (options.workerId)
       qb.andWhere("worker.id = :workerId", { workerId: options.workerId });
-    }
-    if (options.pitakId) {
+    if (options.pitakId)
       qb.andWhere("pitak.id = :pitakId", { pitakId: options.pitakId });
-    }
-    if (options.sessionId) {
+    if (options.sessionId)
       qb.andWhere("session.id = :sessionId", { sessionId: options.sessionId });
-    }
-    if (options.status) {
+    if (options.status)
       qb.andWhere("payment.status = :status", { status: options.status });
-    }
-    if (options.startDate) {
+    if (options.startDate)
       qb.andWhere("payment.paymentDate >= :startDate", {
         startDate: new Date(options.startDate),
       });
-    }
-    if (options.endDate) {
+    if (options.endDate)
       qb.andWhere("payment.paymentDate <= :endDate", {
         endDate: new Date(options.endDate),
       });
-    }
     if (options.search) {
       qb.andWhere(
         "(worker.name LIKE :search OR pitak.location LIKE :search OR payment.referenceNumber LIKE :search)",
         { search: `%${options.search}%` },
       );
     }
-    if (options.idempotencyKey) {
+    if (options.idempotencyKey)
       qb.andWhere("payment.idempotencyKey = :key", {
         key: options.idempotencyKey,
       });
-    }
 
-    // Get aggregate sums
     const sums = await qb
       .clone()
       .select([
@@ -639,7 +568,6 @@ class PaymentService {
       ])
       .getRawOne();
 
-    // Get status breakdown
     const statusBreakdown = await qb
       .clone()
       .select("payment.status", "status")
@@ -660,12 +588,10 @@ class PaymentService {
     };
   }
 
-  /**
-   * Export payments to CSV or JSON
-   * @param {string} format - 'csv' or 'json'
-   * @param {Object} filters
-   * @param {string} user
-   */
+  // ============================================================
+  // 📦 BULK & EXPORT OPERATIONS
+  // ============================================================
+
   async exportPayments(format = "json", filters = {}, user = "system") {
     const result = await this.findAll(filters);
     const payments = result.data;
@@ -722,12 +648,6 @@ class PaymentService {
     return exportData;
   }
 
-  /**
-   * Bulk create payments
-   * @param {Array<Object>} paymentsArray
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async bulkCreate(paymentsArray, user = "system", qr = null) {
     const results = { created: [], errors: [] };
     for (const data of paymentsArray) {
@@ -741,12 +661,6 @@ class PaymentService {
     return results;
   }
 
-  /**
-   * Bulk update payments
-   * @param {Array<{ id: number, updates: Object }>} updatesArray
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async bulkUpdate(updatesArray, user = "system", qr = null) {
     const results = { updated: [], errors: [] };
     for (const { id, updates } of updatesArray) {
@@ -760,12 +674,6 @@ class PaymentService {
     return results;
   }
 
-  /**
-   * Import payments from CSV file
-   * @param {string} filePath
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async importFromCSV(filePath, user = "system", qr = null) {
     const fs = require("fs").promises;
     const csv = require("csv-parse/sync");
@@ -807,140 +715,28 @@ class PaymentService {
     return results;
   }
 
+  // ============================================================
+  // 🎯 CRITICAL OPERATIONS (Extracted to handlers)
+  // ============================================================
+
   /**
-   * Record a payment transaction (partial or full)
-   * @param {number} paymentId
-   * @param {Object} recordData - { amountPaid, applyToDebt, paymentMethod, referenceNumber, notes }
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner|null} qr
+   * Record a payment transaction (partial or full) for an existing payment
    */
   async recordPayment(paymentId, recordData, user = "system", qr = null) {
-    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
-    const Payment = require("../entities/Payment");
-    const PaymentHistory = require("../entities/PaymentHistory");
-    const debtService = require("./DebtService");
-
-    const paymentRepo = this._getRepo(qr, Payment);
-    const historyRepo = this._getRepo(qr, PaymentHistory);
-
-    // 1. Get payment with relations
-    const payment = await paymentRepo.findOne({
-      where: { id: paymentId, deletedAt: null },
-      relations: ["worker", "pitak", "session"],
-    });
-    if (!payment) throw new Error(`Payment #${paymentId} not found`);
-
-    // 2. Validate
-    if (payment.status === "cancelled") {
-      throw new Error("Cannot record payment for a cancelled payment");
-    }
-    if (payment.status === "completed") {
-      throw new Error("Payment is already completed");
-    }
-
-    const { amountPaid, applyToDebt, paymentMethod, referenceNumber, notes } =
-      recordData;
-
-    if (!amountPaid || amountPaid <= 0)
-      throw new Error("Amount paid must be greater than zero");
-
-    const newAmountPaid = (payment.amountPaid || 0) + amountPaid;
-    if (newAmountPaid > payment.grossPay) {
-      throw new Error(
-        `Total amount paid (${newAmountPaid}) exceeds gross pay (${payment.grossPay})`,
-      );
-    }
-
-    if (applyToDebt < 0 || applyToDebt > amountPaid) {
-      throw new Error("Apply to debt amount must be between 0 and amount paid");
-    }
-
-    // 3. Calculate new totals
-    const oldAmountPaid = payment.amountPaid || 0;
-    const oldDebtDeduction = payment.debtDeductionTotal || 0;
-    const newDebtDeduction = oldDebtDeduction + applyToDebt;
-
-    // Recalculate netPay = grossPay - manualDeduction - totalDebtDeduction
-    const manualDeduction = payment.manualDeduction || 0;
-    const newNetPay = payment.grossPay - manualDeduction - newDebtDeduction;
-    if (newNetPay < 0)
-      throw new Error("Net pay cannot be negative after debt deduction");
-
-    // 4. Update payment
-    payment.amountPaid = newAmountPaid;
-    payment.lastPaymentDate = new Date();
-    payment.debtDeductionTotal = newDebtDeduction;
-    payment.netPay = newNetPay;
-    payment.paymentMethod = paymentMethod || payment.paymentMethod;
-    payment.referenceNumber = referenceNumber || payment.referenceNumber;
-    payment.notes = notes
-      ? payment.notes
-        ? payment.notes + "\n" + notes
-        : notes
-      : payment.notes;
-    payment.status =
-      newAmountPaid >= payment.grossPay ? "completed" : "partially_paid";
-    payment.updatedAt = new Date();
-
-    await updateDb(paymentRepo, payment, { queryRunner: qr });
-
-    // 5. Deduct from debts if applyToDebt > 0
-    let actualDeducted = 0;
-    if (applyToDebt > 0) {
-      actualDeducted = await debtService.deductFromWorker(
-        payment.worker.id,
-        applyToDebt,
-        payment.id,
-        payment.session.id,
-        user,
-        qr,
-      );
-      if (actualDeducted < applyToDebt) {
-        console.warn(
-          `Only ${actualDeducted} of ${applyToDebt} could be deducted from debts`,
-        );
-      }
-    }
-
-    // 6. Create PaymentHistory entry
-    const history = historyRepo.create({
-      payment,
-      actionType: "payment_recorded",
-      changedField: "amountPaid",
-      oldValue: oldAmountPaid.toString(),
-      newValue: newAmountPaid.toString(),
-      oldAmount: oldAmountPaid,
-      newAmount: newAmountPaid,
-      notes: `Recorded payment of ${amountPaid}, applied ${actualDeducted} to debt`,
-      performedBy: user,
-      referenceNumber: referenceNumber,
-    });
-    await saveDb(historyRepo, history, { queryRunner: qr });
-    await auditLogger.logCreate("PaymentHistory", history.id, history, user);
-
-    // 7. Audit log
-    await auditLogger.logUpdate(
-      "Payment",
-      payment.id,
-      { amountPaid: oldAmountPaid },
-      { amountPaid: newAmountPaid },
-      user,
-    );
-
-    return payment;
+    const deps = {
+      paymentRepo: this._getRepo(qr, require("../../entities/Payment")),
+      historyRepo: this._getRepo(qr, require("../../entities/PaymentHistory")),
+      debtRepo: this._getRepo(qr, require("../../entities/Debt")), // ✅ idagdag
+      debtService: require("../DebtService"),
+      interestService: require("../InterestAccrualService"), // ✅ idagdag
+      updateDb: require("../../utils/dbUtils/dbActions").updateDb,
+      saveDb: require("../../utils/dbUtils/dbActions").saveDb,
+    };
+    return recordPaymentFn(deps, paymentId, recordData, user, qr);
   }
 
   /**
    * Record a bulk payment for a worker (one transaction covering debt deduction and multiple payments)
-   * @param {number} workerId
-   * @param {number} totalAmount - Total cash given to worker
-   * @param {number} debtDeduction - Portion to apply to outstanding debts
-   * @param {string} paymentMethod
-   * @param {string|null} referenceNumber
-   * @param {string|null} notes
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner|null} qr
-   * @returns {Promise<Object>}
    */
   async recordWorkerPayment(
     workerId,
@@ -952,207 +748,29 @@ class PaymentService {
     user = "system",
     qr = null,
   ) {
-    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
-    const { In } = require("typeorm");
-    const Payment = require("../entities/Payment");
-    const PaymentHistory = require("../entities/PaymentHistory");
-    const debtService = require("./DebtService");
-
-    const paymentRepo = this._getRepo(qr, Payment);
-    const historyRepo = this._getRepo(qr, PaymentHistory);
-
-    // 1. Basic validation
-    if (totalAmount <= 0)
-      throw new Error("Total amount must be greater than zero");
-    if (debtDeduction < 0) throw new Error("Debt deduction cannot be negative");
-    if (debtDeduction > totalAmount)
-      throw new Error("Debt deduction cannot exceed total amount");
-
-    const roundedTotal = roundToTwo(totalAmount);
-    const roundedDeduction = roundToTwo(debtDeduction);
-
-    // 2. Get total outstanding debt balance for this worker (no session filter)
-    const debtStats = await debtService.getStatisticsWithFilters({ workerId });
-    const totalDebtBalance = roundToTwo(debtStats.totalBalance || 0);
-
-    // 3. Get all pending payments (FIFO: paymentDate ASC, createdAt ASC)
-    const pendingPayments = await paymentRepo.find({
-      where: {
-        worker: { id: workerId },
-        status: In(["pending", "partially_paid"]),
-        deletedAt: null,
-      },
-      order: { paymentDate: "ASC", createdAt: "ASC" },
-    });
-
-    // Compute total due (pending payments balance + debt balance)
-    const rawPaymentsDue = pendingPayments.reduce(
-      (sum, p) => sum + (p.netPay - (p.amountPaid || 0)),
-      0,
-    );
-    const totalPaymentsDue = roundToTwo(rawPaymentsDue);
-    const totalDue = roundToTwo(totalPaymentsDue + totalDebtBalance);
-
-    if (roundedTotal > totalDue) {
-      throw new Error(
-        `Total amount (${roundedTotal}) exceeds total due (${totalDue}). ` +
-          `Outstanding debt: ${totalDebtBalance}, Payments due: ${totalPaymentsDue}`,
-      );
-    }
-
-    // 4. Apply debt deduction to debts (this updates debt balances)
-    let actualDebtDeducted = 0;
-    if (roundedDeduction > 0) {
-      actualDebtDeducted = await debtService.deductFromWorker(
-        workerId,
-        roundedDeduction,
-        null,
-        null, // sessionId = null – ignore session
-        user,
-        qr,
-      );
-      if (actualDebtDeducted < roundedDeduction) {
-        throw new Error(
-          `Only ${actualDebtDeducted} of ${roundedDeduction} debt could be deducted. Insufficient debt balance.`,
-        );
-      }
-    }
-
-    // 5. Distribute the combined amount (cash + debt deduction) across pending payments
-    let remainingCash = roundToTwo(roundedTotal - actualDebtDeducted);
-    let remainingDebt = actualDebtDeducted;
-    const updatedPayments = [];
-
-    for (const payment of pendingPayments) {
-      if (remainingCash <= 0 && remainingDebt <= 0) break;
-
-      const gross = payment.grossPay;
-      const manualDed = payment.manualDeduction || 0;
-      const currentPaid = payment.amountPaid || 0;
-      const currentDebtDed = payment.debtDeductionTotal || 0;
-
-      // Total already processed for this payment (cash + debt)
-      const totalProcessed = currentPaid + currentDebtDed;
-      const needed = gross - manualDed - totalProcessed;
-      if (needed <= 0) continue;
-
-      // Apply debt deduction first
-      let debtToApply = 0;
-      if (remainingDebt > 0) {
-        debtToApply = Math.min(remainingDebt, needed);
-        remainingDebt = roundToTwo(remainingDebt - debtToApply);
-      }
-
-      // Then apply cash
-      let cashToApply = 0;
-      if (remainingCash > 0) {
-        const stillNeeded = needed - debtToApply;
-        if (stillNeeded > 0) {
-          cashToApply = Math.min(remainingCash, stillNeeded);
-          remainingCash = roundToTwo(remainingCash - cashToApply);
-        }
-      }
-
-      if (debtToApply === 0 && cashToApply === 0) continue;
-
-      // Compute new values
-      const newDebtDed = roundToTwo(currentDebtDed + debtToApply);
-      const newAmountPaid = roundToTwo(currentPaid + cashToApply);
-      const newNetPay = roundToTwo(gross - manualDed - newDebtDed);
-
-      // Determine status based on cash paid vs net pay
-      let newStatus;
-      if (newAmountPaid >= newNetPay) {
-        newStatus = "completed";
-      } else if (newAmountPaid > 0) {
-        newStatus = "partially_paid";
-      } else {
-        newStatus = "pending";
-      }
-
-      // Update payment object
-      payment.debtDeductionTotal = newDebtDed;
-      payment.amountPaid = newAmountPaid;
-      payment.netPay = newNetPay;
-      payment.status = newStatus;
-      payment.lastPaymentDate = new Date();
-      payment.updatedAt = new Date();
-
-      await updateDb(paymentRepo, payment, {
-        queryRunner: qr,
-        skipSignal: false,
-      });
-
-      // Create history entry for cash payment (if any)
-      if (cashToApply > 0) {
-        const cashHistory = historyRepo.create({
-          payment,
-          actionType: "payment_recorded",
-          changedField: "amountPaid",
-          oldValue: currentPaid.toString(),
-          newValue: newAmountPaid.toString(),
-          oldAmount: currentPaid,
-          newAmount: newAmountPaid,
-          notes: `Part of bulk worker payment. Total cash: ${roundedTotal}, debt deducted: ${actualDebtDeducted}. ${notes || ""}`,
-          performedBy: user,
-          referenceNumber: referenceNumber,
-        });
-        await saveDb(historyRepo, cashHistory, { queryRunner: qr });
-        await auditLogger.logCreate(
-          "PaymentHistory",
-          cashHistory.id,
-          cashHistory,
-          user,
-        );
-      }
-
-      // Create history entry for debt deduction (if any)
-      if (debtToApply > 0) {
-        const debtHistory = historyRepo.create({
-          payment,
-          actionType: "debt_deduction",
-          changedField: "debtDeductionTotal",
-          oldValue: currentDebtDed.toString(),
-          newValue: newDebtDed.toString(),
-          notes: `Debt deduction applied: ${debtToApply} from bulk payment.`,
-          performedBy: user,
-          referenceNumber: referenceNumber,
-        });
-        await saveDb(historyRepo, debtHistory, { queryRunner: qr });
-        await auditLogger.logCreate(
-          "PaymentHistory",
-          debtHistory.id,
-          debtHistory,
-          user,
-        );
-      }
-
-      updatedPayments.push({
-        id: payment.id,
-        cashToApply,
-        debtToApply,
-        newStatus,
-      });
-    }
-
-    return {
-      success: true,
-      totalAmount: roundedTotal,
-      debtDeducted: actualDebtDeducted,
-      paymentsUpdated: updatedPayments.length,
-      remainingUnallocatedCash: remainingCash,
-      remainingUnallocatedDebt: remainingDebt,
-      totalPaymentsDue,
-      totalDebtBalance,
-      details: updatedPayments,
+    const deps = {
+      paymentRepo: this._getRepo(qr, require("../../entities/Payment")),
+      historyRepo: this._getRepo(qr, require("../../entities/PaymentHistory")),
+      debtRepo: this._getRepo(qr, require("../../entities/Debt")),
+      debtService: require("../DebtService"),
+      interestService: require("../InterestAccrualService"),
+      farmSessionDefaultSessionId,
+      updateDb: require("../../utils/dbUtils/dbActions").updateDb,
+      saveDb: require("../../utils/dbUtils/dbActions").saveDb,
     };
+    return recordWorkerPaymentFn(
+      deps,
+      workerId,
+      totalAmount,
+      debtDeduction,
+      paymentMethod,
+      referenceNumber,
+      notes,
+      user,
+      qr,
+    );
   }
 }
-
-const roundToTwo = (num) => {
-  if (num === undefined || num === null) return 0;
-  return Math.round((num + Number.EPSILON) * 100) / 100;
-};
 
 // Singleton instance
 const paymentService = new PaymentService();

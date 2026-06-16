@@ -878,6 +878,8 @@ async function emailEnabled() {
   return getBool("email_enabled", SettingType.NOTIFICATIONS, false);
 }
 
+
+
 module.exports = {
   defaultCurrency,
   auditLogEnabled,

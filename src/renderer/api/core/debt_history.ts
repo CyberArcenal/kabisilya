@@ -1,8 +1,8 @@
 // src/renderer/api/core/debtHistoryAPI.ts
 // Fixed pagination: backend returns { data, pagination } -> frontend expects { items, pagination }
+// ✅ Wala nang payment relation
 
 import type { Debt } from "./debt";
-import type { Payment } from "./payment";
 import type { PaginatedResponse, ApiResponse, BaseFilters } from "../shared";
 
 // ----------------------------------------------------------------------
@@ -23,12 +23,11 @@ export interface DebtHistory {
   updatedAt?: string;
   deletedAt?: string | null;
   debt?: Debt;
-  payment?: Payment | null;
+  // ❌ payment?: Payment | null; // inalis na
 }
 
 export interface DebtHistoryCreateData {
   debtId: number;
-  paymentId?: number | null;
   amountPaid: number;
   previousBalance: number;
   newBalance: number;
@@ -37,6 +36,7 @@ export interface DebtHistoryCreateData {
   referenceNumber?: string;
   notes?: string;
   transactionDate?: string;
+  performedBy?: string; // idinagdag para sa audit
 }
 
 export interface DebtHistoryUpdateData extends Partial<DebtHistoryCreateData> {}
@@ -54,7 +54,7 @@ export type DebtHistoryStatsResponse = ApiResponse<DebtHistoryStats>;
 
 export interface DebtHistoryFilters extends BaseFilters {
   debtId?: number;
-  paymentId?: number;
+  // ❌ paymentId?: number; // inalis na
   transactionType?: string;
   startDate?: string;
   endDate?: string;
@@ -136,7 +136,9 @@ class DebtHistoryAPI {
 
   async create(data: DebtHistoryCreateData): Promise<DebtHistoryResponse> {
     try {
-      const response = await this.call<DebtHistoryResponse>("createDebtHistory", data);
+      // Remove any paymentId if accidentally passed
+      const { paymentId, ...cleanData } = data as any;
+      const response = await this.call<DebtHistoryResponse>("createDebtHistory", cleanData);
       if (response.status) return response;
       throw new Error(response.message || "Failed to create debt history");
     } catch (error: any) {
@@ -147,7 +149,8 @@ class DebtHistoryAPI {
   async update(id: number, data: DebtHistoryUpdateData): Promise<DebtHistoryResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<DebtHistoryResponse>("updateDebtHistory", { id, ...data });
+      const { paymentId, ...cleanData } = data as any;
+      const response = await this.call<DebtHistoryResponse>("updateDebtHistory", { id, ...cleanData });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update debt history");
     } catch (error: any) {

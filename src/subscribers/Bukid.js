@@ -1,11 +1,9 @@
 // src/subscribers/BukidSubscriber.js
+//@ts-check
 const Bukid = require("../entities/Bukid");
-const {
-  BukidStateTransitionService,
-} = require("../stateTransitionService/Bukid");
+const { BukidStateTransitionService } = require("../stateTransitionService/Bukid");
 const { logger } = require("../utils/logger");
-
-console.log("[Subscriber] Loading BukidSubscriber");
+const { logSubscriberEvent, logSubscriberError } = require("../utils/subscriberLogger");
 
 class BukidSubscriber {
   constructor(dataSource) {
@@ -19,18 +17,13 @@ class BukidSubscriber {
 
   async afterInsert(entity, { manager, queryRunner }) {
     try {
-      logger.info("[BukidSubscriber] afterInsert", { id: entity.id });
+      logSubscriberEvent('BukidSubscriber', 'afterInsert', entity);
       const hydrated = await this._hydrateBukid(entity.id, queryRunner);
       if (hydrated) {
-        await this.transitionService.onInitiated(
-          hydrated,
-          null,
-          "system",
-          queryRunner,
-        );
+        await this.transitionService.onInitiated(hydrated, null, "system", queryRunner);
       }
     } catch (err) {
-      logger.error("[BukidSubscriber] afterInsert error", err);
+      logSubscriberError('BukidSubscriber', 'afterInsert', err, { id: entity?.id });
       throw err;
     }
   }
@@ -38,52 +31,33 @@ class BukidSubscriber {
   async afterUpdate(event, { manager, queryRunner }) {
     const { databaseEntity, entity } = event;
     if (!entity) return;
-    logger.info("[BukidSubscriber] afterUpdate", {
-      id: entity.id,
-      oldStatus: databaseEntity?.status,
-      newStatus: entity.status,
-    });
-
-    if (databaseEntity && databaseEntity.status === entity.status) return;
-
-    const hydrated = await this._hydrateBukid(entity.id, queryRunner);
-    if (!hydrated) return;
-
-    switch (entity.status) {
-      case "active":
-        await this.transitionService.onActivate(
-          hydrated,
-          databaseEntity?.status,
-          "system",
-          queryRunner,
-        );
-        break;
-      case "completed":
-        await this.transitionService.onComplete(
-          hydrated,
-          databaseEntity?.status,
-          "system",
-          queryRunner,
-        );
-        break;
-      case "cancelled":
-        await this.transitionService.onCancelled(
-          hydrated,
-          databaseEntity?.status,
-          "system",
-          queryRunner,
-        );
-        break;
-      case "initiated":
-        await this.transitionService.onInitiated(
-          hydrated,
-          databaseEntity?.status,
-          "system",
-          queryRunner,
-        );
-        break;
-      default:
-        logger.warn(`[BukidSubscriber] Unhandled status: ${entity.status}`);
+    try {
+      logSubscriberEvent('BukidSubscriber', 'afterUpdate', entity, {
+        oldStatus: databaseEntity?.status,
+        newStatus: entity.status,
+      });
+      if (databaseEntity && databaseEntity.status === entity.status) return;
+      const hydrated = await this._hydrateBukid(entity.id, queryRunner);
+      if (!hydrated) return;
+      switch (entity.status) {
+        case "active":
+          await this.transitionService.onActivate(hydrated, databaseEntity?.status, "system", queryRunner);
+          break;
+        case "completed":
+          await this.transitionService.onComplete(hydrated, databaseEntity?.status, "system", queryRunner);
+          break;
+        case "cancelled":
+          await this.transitionService.onCancelled(hydrated, databaseEntity?.status, "system", queryRunner);
+          break;
+        case "initiated":
+          await this.transitionService.onInitiated(hydrated, databaseEntity?.status, "system", queryRunner);
+          break;
+        default:
+          logger.warn(`[BukidSubscriber] Unhandled status: ${entity.status}`);
+      }
+    } catch (err) {
+      logSubscriberError('BukidSubscriber', 'afterUpdate', err, { id: entity?.id });
+      throw err;
     }
   }
 

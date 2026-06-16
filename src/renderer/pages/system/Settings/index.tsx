@@ -1,5 +1,7 @@
 // src/renderer/pages/system/settings/index.tsx
 import React, { useState, useEffect } from "react";
+import { Save, RotateCcw, Download, Upload, Settings } from "lucide-react";
+import Button from "../../../components/UI/Button";
 import { useFarmManagementSettings } from "./hooks/useFarmManagementSettings";
 import { SessionSettings } from "./components/farm-settings/SessionSettings";
 import { BukidSettings } from "./components/farm-settings/BukidSettings";
@@ -8,17 +10,19 @@ import { AssignmentSettings } from "./components/farm-settings/AssignmentSetting
 import { PaymentSettings } from "./components/farm-settings/PaymentSettings";
 import { DebtSettings } from "./components/farm-settings/DebtSettings";
 import { AuditSettings } from "./components/farm-settings/AuditSettings";
+import NotificationsSettings from "./components/farm-settings/NotificationsTab";
 import CreateSessionModal from "../sessions/components/CreateSessionModal";
 import { useModal } from "../../../hooks/useModal";
 import { dialogs } from "../../../utils/dialogs";
 import systemConfigAPI from "../../../api/utils/system_config";
 import FarmSettingsHeader from "./components/farm-settings/FarmSettingsHeader";
 import FarmSettingsTabs from "./components/farm-settings/FarmSettingsTabs";
-import NotificationsSettings from "./components/farm-settings/NotificationsTab";
+
+type TabKey = "session" | "bukid" | "pitak" | "assignment" | "payment" | "debt" | "audit" | "notifications";
 
 const FarmManagementSettingsPage: React.FC = () => {
   const sessionFormDialog = useModal();
-  const [activeTab, setActiveTab] = useState<"session" | "bukid" | "pitak" | "assignment" | "payment" | "debt" | "audit" | "notifications">("session");
+  const [activeTab, setActiveTab] = useState<TabKey>("session");
 
   const {
     settings,
@@ -97,7 +101,7 @@ const FarmManagementSettingsPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-color)] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-color)] mx-auto mb-4" />
           <p className="text-[var(--text-secondary)]">Loading farm settings...</p>
         </div>
       </div>
@@ -107,19 +111,69 @@ const FarmManagementSettingsPage: React.FC = () => {
   if (!settings) return null;
 
   return (
-    <div className="space-y-6">
-      <FarmSettingsHeader
-        onSave={saveSettings}
-        onReset={resetToDefaults}
-        onExport={handleExport}
-        onImport={handleImport}
-        saving={saving}
-        hasChanges={hasChanges}
-      />
+    <div className="p-6 space-y-6 animate-fadeIn">
+      {/* Header with actions */}
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg">
+            <Settings className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+              Farm Settings
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+              Configure farm management modules and system preferences
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            onClick={handleExport}
+          >
+            Export
+          </Button>
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              className="hidden"
+            />
+            <Button variant="secondary" size="sm" icon={Upload} as="span">
+              Import
+            </Button>
+          </label>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={RotateCcw}
+            onClick={resetToDefaults}
+            disabled={saving}
+          >
+            Reset
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Save}
+            onClick={saveSettings}
+            loading={saving}
+            disabled={!hasChanges}
+          >
+            Save Changes
+          </Button>
+        </div>
+      </div>
 
+      {/* Tabs */}
       <FarmSettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div className="bg-[var(--card-bg)] rounded-lg border border-[var(--border-color)]/20 p-6">
+      {/* Content */}
+      <div className="bg-[var(--card-bg)] rounded-xl border border-[var(--border-color)] shadow-sm p-6 transition-all">
         {activeTab === "session" && (
           <SessionSettings
             settings={settings.farm_session}

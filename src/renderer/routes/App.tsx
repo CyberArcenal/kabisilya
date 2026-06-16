@@ -25,6 +25,7 @@ import SessionsPage from "../pages/system/sessions";
 import ReminderLogPage from "../pages/reminder";
 import FarmManagementSettingsPage from "../pages/system/Settings";
 import WorkerPaymentSummaryPage from "../pages/finance/worker-payment-summary";
+import DebtSummaryPage from "../pages/finance/debt-summary";
 
 function App() {
   const [licenseAccepted, setLicenseAccepted] = useState(false);
@@ -88,6 +89,7 @@ function App() {
           element={<WorkerPaymentSummaryPage />}
         />
         <Route path="/finance/debts" element={<DebtsPage />} />
+        <Route path="/finance/debt-summary" element={<DebtSummaryPage />} />
         <Route
           path="/finance/payment/history"
           element={<PaymentHistoryPage />}

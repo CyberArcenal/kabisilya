@@ -16,3 +16,4 @@ App.db
 *.db-shm
 src/main/config/env.js
 TODO
+/TODOLIST

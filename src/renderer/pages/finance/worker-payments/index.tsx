@@ -162,7 +162,7 @@ const WorkerPaymentsPage: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-            Worker Payments
+            Payment Management
           </h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
             Manage payments to workers

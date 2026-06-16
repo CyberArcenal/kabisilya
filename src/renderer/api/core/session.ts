@@ -31,7 +31,7 @@ export interface SessionCreateData {
   startDate: string;
   seasonType?: string;
   endDate?: string;
-  status?: string;
+  status?: "active" | "closed" | "archived";
   notes?: string;
 }
 

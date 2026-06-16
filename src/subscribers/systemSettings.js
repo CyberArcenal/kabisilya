@@ -1,103 +1,60 @@
 // src/subscribers/SystemSettingSubscriber.js
-// @ts-check
+//@ts-check
 const { SystemSetting } = require("../entities/systemSettings");
-const { logger } = require("../utils/logger");
-
-console.log("[Subscriber] Loading SystemSettingSubscriber");
+const { logSubscriberEvent, logSubscriberError } = require("../utils/subscriberLogger");
 
 class SystemSettingSubscriber {
   listenTo() {
     return SystemSetting;
   }
 
-  /**
-   * @param {any} entity
-   */
   async beforeInsert(entity) {
     try {
-      // @ts-ignore
-      // logger.info("[SystemSettingSubscriber] beforeInsert", {
-      //   entity: JSON.parse(JSON.stringify(entity)),
-      // });
+      logSubscriberEvent('SystemSettingSubscriber', 'beforeInsert', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[SystemSettingSubscriber] beforeInsert error", err);
+      logSubscriberError('SystemSettingSubscriber', 'beforeInsert', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {any} entity
-   */
   async afterInsert(entity) {
     try {
-      // @ts-ignore
-      logger.info("[SystemSettingSubscriber] afterInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('SystemSettingSubscriber', 'afterInsert', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[SystemSettingSubscriber] afterInsert error", err);
+      logSubscriberError('SystemSettingSubscriber', 'afterInsert', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {any} entity
-   */
   async beforeUpdate(entity) {
     try {
-      // @ts-ignore
-      logger.info("[SystemSettingSubscriber] beforeUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('SystemSettingSubscriber', 'beforeUpdate', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[SystemSettingSubscriber] beforeUpdate error", err);
+      logSubscriberError('SystemSettingSubscriber', 'beforeUpdate', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {{ entity: any; }} event
-   */
   async afterUpdate(event) {
     try {
       const { entity } = event;
-      // @ts-ignore
-      logger.info("[SystemSettingSubscriber] afterUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('SystemSettingSubscriber', 'afterUpdate', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[SystemSettingSubscriber] afterUpdate error", err);
+      logSubscriberError('SystemSettingSubscriber', 'afterUpdate', err);
     }
   }
 
-  /**
-   * @param {any} entity
-   */
   async beforeRemove(entity) {
     try {
-      // @ts-ignore
-      logger.info("[SystemSettingSubscriber] beforeRemove", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('SystemSettingSubscriber', 'beforeRemove', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[SystemSettingSubscriber] beforeRemove error", err);
+      logSubscriberError('SystemSettingSubscriber', 'beforeRemove', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {any} event
-   */
   async afterRemove(event) {
     try {
-      // @ts-ignore
-      logger.info("[SystemSettingSubscriber] afterRemove", {
-        event: JSON.parse(JSON.stringify(event)),
-      });
+      const { entityId } = event;
+      logSubscriberEvent('SystemSettingSubscriber', 'afterRemove', null, { id: entityId });
     } catch (err) {
-      // @ts-ignore
-      logger.error("[SystemSettingSubscriber] afterRemove error", err);
+      logSubscriberError('SystemSettingSubscriber', 'afterRemove', err);
     }
   }
 }

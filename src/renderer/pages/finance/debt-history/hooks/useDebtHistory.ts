@@ -7,9 +7,9 @@ export const useDebtHistory = () => {
   const [history, setHistory] = useState<DebtHistoryWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Filters
   const [debtId, setDebtId] = useState<number | undefined>(undefined);
@@ -24,7 +24,7 @@ export const useDebtHistory = () => {
     try {
       const params: any = {
         page,
-        pageSize,
+        limit: pageSize,
         sortBy: "transactionDate",
         sortOrder: "DESC",
       };
@@ -52,6 +52,11 @@ export const useDebtHistory = () => {
     fetchHistory();
   }, [fetchHistory]);
 
+  // Reset page when filters change (optional but recommended)
+  useEffect(() => {
+    setPage(1);
+  }, [debtId, transactionType, startDate, endDate, minAmount, maxAmount]);
+
   const resetFilters = () => {
     setDebtId(undefined);
     setTransactionType("");
@@ -62,14 +67,52 @@ export const useDebtHistory = () => {
     setPage(1);
   };
 
+  const refresh = () => fetchHistory();
+
+  const exportToCSV = () => {
+    if (history.length === 0) return;
+    const headers = [
+      "Debt ID",
+      "Transaction Type",
+      "Amount Paid",
+      "Previous Balance",
+      "New Balance",
+      "Transaction Date",
+      "Payment Method",
+      "Reference Number",
+      "Notes",
+    ];
+    const rows = history.map((item) => [
+      item.debt?.id || "",
+      item.transactionType || "",
+      item.amountPaid.toFixed(2),
+      item.previousBalance.toFixed(2),
+      item.newBalance.toFixed(2),
+      new Date(item.transactionDate).toLocaleString(),
+      item.paymentMethod || "",
+      item.referenceNumber || "",
+      item.notes || "",
+    ]);
+    const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `debt_history_${new Date().toISOString().slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return {
     history,
     loading,
     page,
-    totalPages,
+    pageSize,
     totalCount,
+    totalPages,
     filters: { debtId, transactionType, startDate, endDate, minAmount, maxAmount },
     setPage,
+    setPageSize,
     setDebtId,
     setTransactionType,
     setStartDate,
@@ -77,5 +120,7 @@ export const useDebtHistory = () => {
     setMinAmount,
     setMaxAmount,
     resetFilters,
+    refresh,
+    exportToCSV,
   };
 };

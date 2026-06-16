@@ -1,103 +1,59 @@
 // src/subscribers/PaymentHistorySubscriber.js
-// @ts-check
 const PaymentHistory = require("../entities/PaymentHistory");
-const { logger } = require("../utils/logger");
-
-console.log("[Subscriber] Loading PaymentHistorySubscriber");
+const { logSubscriberEvent, logSubscriberError } = require("../utils/subscriberLogger");
 
 class PaymentHistorySubscriber {
   listenTo() {
     return PaymentHistory;
   }
 
-  /**
-   * @param {any} entity
-   */
   async beforeInsert(entity) {
     try {
-      // @ts-ignore
-      logger.info("[PaymentHistorySubscriber] beforeInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('PaymentHistorySubscriber', 'beforeInsert', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[PaymentHistorySubscriber] beforeInsert error", err);
+      logSubscriberError('PaymentHistorySubscriber', 'beforeInsert', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {any} entity
-   */
   async afterInsert(entity) {
     try {
-      // @ts-ignore
-      logger.info("[PaymentHistorySubscriber] afterInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('PaymentHistorySubscriber', 'afterInsert', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[PaymentHistorySubscriber] afterInsert error", err);
+      logSubscriberError('PaymentHistorySubscriber', 'afterInsert', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {any} entity
-   */
   async beforeUpdate(entity) {
     try {
-      // @ts-ignore
-      logger.info("[PaymentHistorySubscriber] beforeUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('PaymentHistorySubscriber', 'beforeUpdate', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[PaymentHistorySubscriber] beforeUpdate error", err);
+      logSubscriberError('PaymentHistorySubscriber', 'beforeUpdate', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {{ entity: any; }} event
-   */
   async afterUpdate(event) {
     try {
       const { entity } = event;
-      // @ts-ignore
-      logger.info("[PaymentHistorySubscriber] afterUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('PaymentHistorySubscriber', 'afterUpdate', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[PaymentHistorySubscriber] afterUpdate error", err);
+      logSubscriberError('PaymentHistorySubscriber', 'afterUpdate', err);
     }
   }
 
-  /**
-   * @param {any} entity
-   */
   async beforeRemove(entity) {
     try {
-      // @ts-ignore
-      logger.info("[PaymentHistorySubscriber] beforeRemove", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('PaymentHistorySubscriber', 'beforeRemove', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[PaymentHistorySubscriber] beforeRemove error", err);
+      logSubscriberError('PaymentHistorySubscriber', 'beforeRemove', err, { id: entity?.id });
     }
   }
 
-  /**
-   * @param {any} event
-   */
   async afterRemove(event) {
     try {
-      // @ts-ignore
-      logger.info("[PaymentHistorySubscriber] afterRemove", {
-        event: JSON.parse(JSON.stringify(event)),
-      });
+      const { entityId } = event;
+      logSubscriberEvent('PaymentHistorySubscriber', 'afterRemove', null, { id: entityId });
     } catch (err) {
-      // @ts-ignore
-      logger.error("[PaymentHistorySubscriber] afterRemove error", err);
+      logSubscriberError('PaymentHistorySubscriber', 'afterRemove', err);
     }
   }
 }

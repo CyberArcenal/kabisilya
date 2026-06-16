@@ -1,11 +1,9 @@
-// src/subscribers/NotificationLogSubscriber.js
+// src/subscribers/ReminderLog.js
 //@ts-check
 const NotificationLog = require("../entities/NotificationLog");
-const { NotificationLogStateTransitionService } = require("../stateTransitionService/ReminderLog");
+const { NotificationLogStateTransitionService } = require("../stateTransitionService/ReminderLog"); // tawag sa transition service
 const { logger } = require("../utils/logger");
-
-
-console.log("[Subscriber] Loading ReminderLogSubscriber");
+const { logSubscriberEvent, logSubscriberError } = require("../utils/subscriberLogger");
 
 class NotificationLogSubscriber {
   constructor() {
@@ -14,9 +12,7 @@ class NotificationLogSubscriber {
 
   async getTransitionService(dataSource) {
     if (!this.transitionService) {
-      this.transitionService = new NotificationLogStateTransitionService(
-        dataSource,
-      );
+      this.transitionService = new NotificationLogStateTransitionService(dataSource);
     }
     return this.transitionService;
   }
@@ -27,27 +23,24 @@ class NotificationLogSubscriber {
 
   async beforeInsert(entity, { manager, queryRunner }) {
     try {
-      logger.info("[ReminderLogSubscriber] beforeInsert", {
-        id: entity.id,
+      logSubscriberEvent('NotificationLogSubscriber', 'beforeInsert', entity, {
         notificationId: entity.notificationId,
         status: entity.status,
       });
     } catch (err) {
-      logger.error("[ReminderLogSubscriber] beforeInsert error", err);
+      logSubscriberError('NotificationLogSubscriber', 'beforeInsert', err, { id: entity?.id });
       throw err;
     }
   }
 
   async afterInsert(entity, { manager, queryRunner }) {
     try {
-      logger.info("[ReminderLogSubscriber] afterInsert", {
-        id: entity.id,
+      logSubscriberEvent('NotificationLogSubscriber', 'afterInsert', entity, {
         notificationId: entity.notificationId,
         status: entity.status,
       });
-
-      // 🔍 I-log ang queryRunner details
-      logger.info(`[ReminderLogSubscriber] queryRunner details:`, {
+      // I-log ang queryRunner details para sa debugging
+      logger.info(`[NotificationLogSubscriber] queryRunner details:`, {
         constructorName: queryRunner?.constructor?.name,
         hasAfterCommit: typeof queryRunner?.afterCommit,
         hasManager: !!queryRunner?.manager,
@@ -59,16 +52,16 @@ class NotificationLogSubscriber {
         await service.onCreate(entity, "system", queryRunner);
       }
     } catch (err) {
-      logger.error("[ReminderLogSubscriber] afterInsert error", err);
+      logSubscriberError('NotificationLogSubscriber', 'afterInsert', err, { id: entity?.id });
       throw err;
     }
   }
 
   async beforeUpdate(entity, { manager, queryRunner }) {
     try {
-      logger.info("[ReminderLogSubscriber] beforeUpdate", { id: entity.id });
+      logSubscriberEvent('NotificationLogSubscriber', 'beforeUpdate', entity);
     } catch (err) {
-      logger.error("[ReminderLogSubscriber] beforeUpdate error", err);
+      logSubscriberError('NotificationLogSubscriber', 'beforeUpdate', err, { id: entity?.id });
       throw err;
     }
   }
@@ -76,7 +69,7 @@ class NotificationLogSubscriber {
   async afterUpdate(event, { manager, queryRunner }) {
     try {
       const { entity } = event;
-      logger.info("[ReminderLogSubscriber] afterUpdate", { id: entity.id });
+      logSubscriberEvent('NotificationLogSubscriber', 'afterUpdate', entity);
       const service = await this.getTransitionService(manager.connection);
       if (entity.status === "failed" && entity.retry_count < 3) {
         await service.onRetry(entity, "system", queryRunner);
@@ -84,27 +77,26 @@ class NotificationLogSubscriber {
         await service.onAcknowledge(entity, "system", queryRunner);
       }
     } catch (err) {
-      logger.error("[ReminderLogSubscriber] afterUpdate error", err);
+      logSubscriberError('NotificationLogSubscriber', 'afterUpdate', err, { id: entity?.id });
       throw err;
     }
   }
 
   async beforeRemove(entity, { manager, queryRunner }) {
     try {
-      logger.info("[ReminderLogSubscriber] beforeRemove", { id: entity.id });
+      logSubscriberEvent('NotificationLogSubscriber', 'beforeRemove', entity);
     } catch (err) {
-      logger.error("[ReminderLogSubscriber] beforeRemove error", err);
+      logSubscriberError('NotificationLogSubscriber', 'beforeRemove', err, { id: entity?.id });
       throw err;
     }
   }
 
   async afterRemove(event, { manager, queryRunner }) {
     try {
-      logger.info("[ReminderLogSubscriber] afterRemove", {
-        id: event.entityId,
-      });
+      const { entityId } = event;
+      logSubscriberEvent('NotificationLogSubscriber', 'afterRemove', null, { id: entityId });
     } catch (err) {
-      logger.error("[ReminderLogSubscriber] afterRemove error", err);
+      logSubscriberError('NotificationLogSubscriber', 'afterRemove', err, { id: event?.entityId });
       throw err;
     }
   }

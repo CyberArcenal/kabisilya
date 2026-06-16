@@ -15,6 +15,7 @@ const { SystemSetting } = require("../../entities/systemSettings");
 const Session = require("../../entities/Session");
 const { AuditLog } = require("../../entities/AuditLog");
 const NotificationLog = require("../../entities/NotificationLog");
+const DebtPayment = require("../../entities/DebtPayment");
 
 const config = getDatabaseConfig();
 
@@ -24,6 +25,7 @@ const entities = [
   AuditLog,
   Bukid,
   Debt,
+  DebtPayment,
   DebtHistory,
   LicenseCache,
   Notification,

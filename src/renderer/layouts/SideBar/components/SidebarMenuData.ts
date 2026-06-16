@@ -71,15 +71,18 @@ export const menuItems: MenuItem[] = [
       {
         path: "/finance/worker-payment-summary",
         name: "Worker Payment Summary",
-        icon: Receipt, // <-- palitan mula HandCoins
+        icon: Receipt,
+      },
+      {
+        path: "/finance/debt-summary",
+        name: "Worker Debt Summary",
+        icon: Banknote,
       },
       {
         path: "/finance/worker/payments",
         name: "Payment Management",
-        icon: HandCoins, // iwan
+        icon: HandCoins,
       },
-
-      // { path: "/finance/payments", name: "Payments", icon: Banknote },
       { path: "/finance/debts", name: "Debt Management", icon: Receipt },
       {
         path: "/finance/payment/history",

@@ -32,6 +32,7 @@ const AuditTrailCleanupScheduler = require("../scheduler/auditTrailCleanupSchedu
 // @ts-ignore
 const { logger } = require("../utils/logger.js");
 const ipcModules = require("./ipcModules.js");
+const InterestAccrualScheduler = require("../scheduler/interestAccrualScheduler.js");
 
 // ===================== CUSTOM PROTOCOLS =====================
 protocol.registerSchemesAsPrivileged([
@@ -578,6 +579,16 @@ async function startupSequence() {
     auditCleaner.start();
     // const reminderScheduler = new OverdueReminderScheduler();
     // reminderScheduler.start().catch(err => log(LogLevel.ERROR, "Failed to start Overdue Reminder Scheduler", err));
+
+    const interestAccrualScheduler = new InterestAccrualScheduler();
+    interestAccrualScheduler.start().catch((err) => {
+      logger.error(
+        LogLevel.ERROR,
+        "Failed to start Interest Accrual Scheduler",
+        // @ts-ignore
+        err,
+      );
+    });
   } catch (error) {
     // @ts-ignore
     log(LogLevel.ERROR, "Startup sequence failed:", error);

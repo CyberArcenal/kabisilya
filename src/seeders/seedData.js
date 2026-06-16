@@ -13,6 +13,7 @@ const Worker = require("../entities/Worker");
 const Assignment = require("../entities/Assignment");
 const Debt = require("../entities/Debt");
 const DebtHistory = require("../entities/DebtHistory");
+const DebtPayment = require("../entities/DebtPayment"); // ✅ BAGO
 const Payment = require("../entities/Payment");
 const PaymentHistory = require("../entities/PaymentHistory");
 
@@ -64,6 +65,7 @@ async function createSeedDataSource() {
       Assignment,
       Debt,
       DebtHistory,
+      DebtPayment, // ✅ BAGO
       Payment,
       PaymentHistory,
       SystemSetting,
@@ -81,7 +83,7 @@ async function seedData() {
   try {
     const shouldReset =
       process.argv.includes("--reset") || process.argv.includes("reset");
-    console.log(`Reset flag: ${shouldReset}`); // Debug log
+    console.log(`Reset flag: ${shouldReset}`);
 
     if (shouldReset) {
       console.log("🔄 Resetting database before seeding...");
@@ -107,6 +109,7 @@ async function seedData() {
       const assignmentRepo = seedDataSource.getRepository(Assignment);
       const debtRepo = seedDataSource.getRepository(Debt);
       const debtHistoryRepo = seedDataSource.getRepository(DebtHistory);
+      const debtPaymentRepo = seedDataSource.getRepository(DebtPayment); // ✅ BAGO
       const paymentRepo = seedDataSource.getRepository(Payment);
       const paymentHistoryRepo = seedDataSource.getRepository(PaymentHistory);
       const systemSettingRepo = seedDataSource.getRepository(SystemSetting);
@@ -307,9 +310,6 @@ async function seedData() {
       // 5. ASSIGNMENTS
       // ------------------------------------------------------------------
       console.log("📋 Seeding Assignments...");
-      /**
-       * @type {{ luwangCount: number; assignmentDate: Date; status: any; notes: string; worker: { name: string; contact: string; email: string; address: string; status: any; hireDate: Date; } & { id: unknown; name: unknown; contact: unknown; email: unknown; address: unknown; status: unknown; hireDate: unknown; createdAt: unknown; deletedAt: unknown; updatedAt: unknown; }; pitak: any; session: any; }[]}
-       */
       const assignments = [];
       const assignmentStatuses = [
         "initiated",
@@ -400,9 +400,6 @@ async function seedData() {
       // 7. PAYMENTS
       // ------------------------------------------------------------------
       console.log("💰 Seeding Payments...");
-      /**
-       * @type {{ grossPay: number; manualDeduction: number; netPay: number; status: any; paymentDate: Date; paymentMethod: any; referenceNumber: string; periodStart: Date; periodEnd: Date; totalDebtDeduction: number; otherDeductions: number; notes: string; worker: { name: string; contact: string; email: string; address: string; status: any; hireDate: Date; } & { id: unknown; name: unknown; contact: unknown; email: unknown; address: unknown; status: unknown; hireDate: unknown; createdAt: unknown; deletedAt: unknown; updatedAt: unknown; }; pitak: any; session: any; assignment: any; }[]}
-       */
       const payments = [];
       const paymentStatuses = [
         "pending",
@@ -460,7 +457,7 @@ async function seedData() {
       console.log(`   Created ${savedPayments.length} payments`);
 
       // ------------------------------------------------------------------
-      // 8. DEBT HISTORIES
+      // 8. DEBT HISTORIES (walang payment)
       // ------------------------------------------------------------------
       console.log("📝 Seeding Debt Histories...");
       const debtHistories = [];
@@ -487,10 +484,7 @@ async function seedData() {
                 new Date(),
               ),
               debt,
-              payment:
-                randomElement(
-                  savedPayments.filter((p) => p.worker.id === debt.worker.id),
-                ) || null,
+              // ❌ Wala nang payment: payment,
             });
           }
         }
@@ -499,7 +493,49 @@ async function seedData() {
       console.log(`   Created ${savedDebtHistories.length} debt histories`);
 
       // ------------------------------------------------------------------
-      // 9. PAYMENT HISTORIES
+      // 9. DEBT PAYMENTS (link payment at debt)
+      // ------------------------------------------------------------------
+      console.log("🔗 Seeding Debt Payments...");
+      const debtPayments = [];
+      for (const payment of savedPayments) {
+        // Kung may totalDebtDeduction, gumawa ng DebtPayment
+        if (payment.totalDebtDeduction > 0) {
+          // Humanap ng mga utang ng worker na may balance
+          const workerDebts = savedDebts.filter(
+            (d) => d.worker.id === payment.worker.id && d.balance > 0,
+          );
+          if (workerDebts.length === 0) continue;
+          // Mag-allocate ng deduction sa mga utang (FIFO)
+          let remaining = payment.totalDebtDeduction;
+          for (const debt of workerDebts) {
+            if (remaining <= 0) break;
+            const deductAmount = Math.min(remaining, debt.balance);
+            if (deductAmount <= 0) continue;
+            const oldBalance = debt.balance;
+            // Update debt balance (para sa seed, diretso)
+            debt.balance -= deductAmount;
+            if (debt.balance === 0) debt.status = "paid";
+            else if (debt.status !== "partially_paid") debt.status = "partially_paid";
+            // I-save ang debt (kailangan i-update)
+            await debtRepo.save(debt);
+            // Gumawa ng DebtPayment
+            debtPayments.push({
+              payment,
+              debt,
+              amount: deductAmount,
+              previousBalance: oldBalance,
+              newBalance: debt.balance,
+              notes: `Deducted from payment #${payment.id}`,
+            });
+            remaining -= deductAmount;
+          }
+        }
+      }
+      const savedDebtPayments = await debtPaymentRepo.save(debtPayments);
+      console.log(`   Created ${savedDebtPayments.length} debt payments`);
+
+      // ------------------------------------------------------------------
+      // 10. PAYMENT HISTORIES
       // ------------------------------------------------------------------
       console.log("📊 Seeding Payment Histories...");
       const paymentHistories = [];
@@ -538,10 +574,9 @@ async function seedData() {
       );
 
       // ------------------------------------------------------------------
-      // 10. SYSTEM SETTINGS – CLEAR OLD ONES FIRST
+      // 11. SYSTEM SETTINGS – CLEAR OLD ONES FIRST
       // ------------------------------------------------------------------
       console.log("⚙️ Seeding System Settings...");
-      // Clear all existing settings – works for SQLite
       await systemSettingRepo.clear();
       console.log("   Cleared existing system settings");
 
@@ -607,6 +642,7 @@ async function seedData() {
       console.log(`   Assignments: ${savedAssignments.length}`);
       console.log(`   Debts: ${savedDebts.length}`);
       console.log(`   Debt Histories: ${savedDebtHistories.length}`);
+      console.log(`   Debt Payments: ${savedDebtPayments.length}`);
       console.log(`   Payments: ${savedPayments.length}`);
       console.log(`   Payment Histories: ${savedPaymentHistories.length}`);
     } catch (error) {

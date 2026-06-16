@@ -1,103 +1,60 @@
 // src/subscribers/AuditLogSubscriber.js
-// @ts-check
+//@ts-check
 const AuditLog = require("../entities/AuditLog");
-const { logger } = require("../utils/logger");
-
-console.log("[Subscriber] Loading AuditLogSubscriber");
+const { logSubscriberEvent, logSubscriberError } = require("../utils/subscriberLogger");
 
 class AuditLogSubscriber {
   listenTo() {
     return AuditLog;
   }
 
-  /**
-     * @param {any} entity
-     */
   async beforeInsert(entity) {
     try {
-      // @ts-ignore
-      logger.info("[AuditLogSubscriber] beforeInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('AuditLogSubscriber', 'beforeInsert', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[AuditLogSubscriber] beforeInsert error", err);
+      logSubscriberError('AuditLogSubscriber', 'beforeInsert', err, { id: entity?.id });
     }
   }
 
-  /**
-     * @param {any} entity
-     */
   async afterInsert(entity) {
     try {
-      // @ts-ignore
-      logger.info("[AuditLogSubscriber] afterInsert", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('AuditLogSubscriber', 'afterInsert', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[AuditLogSubscriber] afterInsert error", err);
+      logSubscriberError('AuditLogSubscriber', 'afterInsert', err, { id: entity?.id });
     }
   }
 
-  /**
-     * @param {any} entity
-     */
   async beforeUpdate(entity) {
     try {
-      // @ts-ignore
-      logger.info("[AuditLogSubscriber] beforeUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('AuditLogSubscriber', 'beforeUpdate', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[AuditLogSubscriber] beforeUpdate error", err);
+      logSubscriberError('AuditLogSubscriber', 'beforeUpdate', err, { id: entity?.id });
     }
   }
 
-  /**
-     * @param {{ entity: any; }} event
-     */
   async afterUpdate(event) {
     try {
       const { entity } = event;
-      // @ts-ignore
-      logger.info("[AuditLogSubscriber] afterUpdate", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('AuditLogSubscriber', 'afterUpdate', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[AuditLogSubscriber] afterUpdate error", err);
+      logSubscriberError('AuditLogSubscriber', 'afterUpdate', err);
     }
   }
 
-  /**
-     * @param {any} entity
-     */
   async beforeRemove(entity) {
     try {
-      // @ts-ignore
-      logger.info("[AuditLogSubscriber] beforeRemove", {
-        entity: JSON.parse(JSON.stringify(entity)),
-      });
+      logSubscriberEvent('AuditLogSubscriber', 'beforeRemove', entity);
     } catch (err) {
-      // @ts-ignore
-      logger.error("[AuditLogSubscriber] beforeRemove error", err);
+      logSubscriberError('AuditLogSubscriber', 'beforeRemove', err, { id: entity?.id });
     }
   }
 
-  /**
-     * @param {any} event
-     */
   async afterRemove(event) {
     try {
-      // @ts-ignore
-      logger.info("[AuditLogSubscriber] afterRemove", {
-        event: JSON.parse(JSON.stringify(event)),
-      });
+      const { entityId } = event;
+      logSubscriberEvent('AuditLogSubscriber', 'afterRemove', null, { id: entityId });
     } catch (err) {
-      // @ts-ignore
-      logger.error("[AuditLogSubscriber] afterRemove error", err);
+      logSubscriberError('AuditLogSubscriber', 'afterRemove', err);
     }
   }
 }

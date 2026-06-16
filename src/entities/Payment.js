@@ -96,7 +96,7 @@ const Payment = new EntitySchema({
       cascade: true,
     },
     debtPayments: {
-      target: "DebtHistory",
+      target: "DebtPayment",
       type: "one-to-many",
       inverseSide: "payment",
       cascade: true,

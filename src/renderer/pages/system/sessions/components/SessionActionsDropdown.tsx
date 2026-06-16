@@ -63,7 +63,7 @@ const SessionActionsDropdown: React.FC<SessionActionsDropdownProps> = ({
     };
   };
 
-  const isLocked = session.status === "archived" || session.status === "closed";
+  const isLocked = session.status === "archived";
   const canSetActive = session.status !== "active";
 
   const handleDeleteClick = async () => {
@@ -80,14 +80,14 @@ const SessionActionsDropdown: React.FC<SessionActionsDropdownProps> = ({
   };
 
   const handleStatusClick = () => {
-    // if (isLocked) {
-    //   dialogs.warning(
-    //     `Cannot change status of a ${session.status} session.`,
-    //     "Status Locked"
-    //   );
-    //   setIsOpen(false);
-    //   return;
-    // }
+    if (isLocked) {
+      dialogs.warning(
+        `Cannot change status of a ${session.status} session.`,
+        "Status Locked"
+      );
+      setIsOpen(false);
+      return;
+    }
     handleAction(() => onChangeStatus(session));
   };
 

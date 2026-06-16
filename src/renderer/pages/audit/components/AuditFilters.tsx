@@ -30,10 +30,20 @@ const AuditFilters: React.FC<Props> = ({
   );
 
   return (
-    <div className="bg-[var(--card-bg)] rounded-xl p-4 border border-[var(--border-color)] space-y-3">
-      <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
-        <Filter className="w-4 h-4" />
-        Filters
+    <div className="bg-[var(--card-bg)] rounded-xl p-5 border border-[var(--border-color)] shadow-sm transition-all">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+          <Filter className="w-4 h-4" />
+          Filters
+        </div>
+        {hasFilters && (
+          <button
+            onClick={onReset}
+            className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1"
+          >
+            <X className="w-3 h-3" /> Clear all
+          </button>
+        )}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         {/* Search */}
@@ -110,13 +120,6 @@ const AuditFilters: React.FC<Props> = ({
           style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
         />
       </div>
-      {hasFilters && (
-        <div className="flex justify-end">
-          <button onClick={onReset} className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1">
-            <X className="w-3 h-3" /> Clear all filters
-          </button>
-        </div>
-      )}
     </div>
   );
 };

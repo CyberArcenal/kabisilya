@@ -691,6 +691,167 @@ class BukidService {
     }
     return results;
   }
+
+  // services/DebtService.js – PAY DEBT (with interest accrual)
+  async payDebt(
+    id,
+    amount,
+    user = "system",
+    qr = null,
+    paymentMethod = null,
+    referenceNumber = null,
+    notes = null,
+  ) {
+    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
+    const Debt = require("../entities/Debt");
+    const DebtHistory = require("../entities/DebtHistory");
+    const InterestAccrualService = require("./InterestAccrualService");
+
+    const debtRepo = this._getRepo(qr, Debt);
+    const historyRepo = this._getRepo(qr, DebtHistory);
+    const interestService = new InterestAccrualService();
+
+    // ✅ STEP 1: Kunin ang debt at i-accrue ang interes hanggang ngayon
+    const debt = await debtRepo.findOne({ where: { id, deletedAt: null } });
+    if (!debt) throw new Error(`Debt with ID ${id} not found`);
+
+    await interestService.applyAccrual(debt, new Date(), qr);
+
+    // ✅ STEP 2: I-refresh ang debt pagkatapos ng accrual
+    const refreshedDebt = await debtRepo.findOne({
+      where: { id, deletedAt: null },
+    });
+    if (!refreshedDebt) throw new Error(`Debt with ID ${id} not found`);
+
+    if (amount <= 0) throw new Error("Payment amount must be positive");
+    if (amount > refreshedDebt.balance) {
+      throw new Error(
+        `Amount cannot exceed remaining balance of ${refreshedDebt.balance}`,
+      );
+    }
+
+    const oldBalance = refreshedDebt.balance;
+    refreshedDebt.balance = parseFloat(
+      (refreshedDebt.balance - amount).toFixed(2),
+    );
+    refreshedDebt.updatedAt = new Date();
+
+    if (refreshedDebt.balance === 0) {
+      refreshedDebt.status = "paid";
+    } else if (refreshedDebt.status !== "partially_paid") {
+      refreshedDebt.status = "partially_paid";
+    }
+
+    await updateDb(debtRepo, refreshedDebt, { queryRunner: qr });
+
+    const history = historyRepo.create({
+      debt: refreshedDebt,
+      amountPaid: amount,
+      previousBalance: oldBalance,
+      newBalance: refreshedDebt.balance,
+      transactionType: "payment",
+      paymentMethod,
+      referenceNumber,
+      notes: notes || `Payment of ${amount} recorded`,
+      transactionDate: new Date(),
+    });
+    await saveDb(historyRepo, history, { queryRunner: qr });
+    await auditLogger.logCreate("DebtHistory", history.id, history, user);
+
+    return refreshedDebt;
+  }
+
+  // services/DebtService.js – DEDUCT FROM WORKER (with interest accrual)
+  async deductFromWorker(
+    workerId,
+    amount,
+    paymentId,
+    sessionId,
+    user = "system",
+    qr = null,
+  ) {
+    const { updateDb, saveDb } = require("../utils/dbUtils/dbActions");
+    const Debt = require("../entities/Debt");
+    const DebtHistory = require("../entities/DebtHistory");
+    const Payment = require("../entities/Payment");
+    const InterestAccrualService = require("./InterestAccrualService");
+
+    const debtRepo = this._getRepo(qr, Debt);
+    const historyRepo = this._getRepo(qr, DebtHistory);
+    const paymentRepo = this._getRepo(qr, Payment);
+    const interestService = new InterestAccrualService();
+
+    // ✅ STEP 1: Kunin ang mga active debts (pending/partially_paid)
+    let activeDebts = await debtRepo.find({
+      where: {
+        worker: { id: workerId },
+        session: { id: sessionId },
+        status: In(["pending", "partially_paid"]),
+        deletedAt: null,
+      },
+      order: { dueDate: "ASC" },
+    });
+
+    // ✅ STEP 2: I-accrue ang interes para sa LAHAT ng active debts hanggang ngayon
+    const today = new Date();
+    for (const debt of activeDebts) {
+      await interestService.applyAccrual(debt, today, qr);
+    }
+
+    // ✅ STEP 3: I-refresh ang debts pagkatapos ng accrual
+    const refreshedDebts = await debtRepo.find({
+      where: {
+        worker: { id: workerId },
+        session: { id: sessionId },
+        status: In(["pending", "partially_paid"]),
+        deletedAt: null,
+      },
+      order: { dueDate: "ASC" },
+    });
+
+    // ✅ STEP 4: Magpatuloy sa deduction gamit ang refreshed debts
+    let remaining = amount;
+    let totalDeducted = 0;
+
+    for (const debt of refreshedDebts) {
+      if (remaining <= 0) break;
+      const deductAmount = Math.min(remaining, debt.balance); // gumamit ng balance
+      if (deductAmount <= 0) continue;
+
+      const oldBalance = debt.balance;
+      debt.balance = parseFloat((debt.balance - deductAmount).toFixed(2));
+      remaining = parseFloat((remaining - deductAmount).toFixed(2));
+      totalDeducted = parseFloat((totalDeducted + deductAmount).toFixed(2));
+
+      // Update debt status
+      if (debt.balance === 0) {
+        debt.status = "paid";
+      } else if (debt.status !== "partially_paid") {
+        debt.status = "partially_paid";
+      }
+      debt.updatedAt = new Date();
+      await updateDb(debtRepo, debt, { queryRunner: qr, skipSignal: true });
+
+      // Create DebtHistory entry
+      const payment = await paymentRepo.findOne({ where: { id: paymentId } });
+      const history = historyRepo.create({
+        debt,
+        payment,
+        amountPaid: parseFloat(deductAmount.toFixed(2)),
+        previousBalance: oldBalance,
+        newBalance: debt.balance,
+        transactionType: "payment",
+        notes: paymentId
+          ? `Payment #${paymentId} deducted from debt`
+          : `Payment deducted from debt`,
+        transactionDate: new Date(),
+      });
+      await saveDb(historyRepo, history, { queryRunner: qr });
+      await auditLogger.logCreate("DebtHistory", history.id, history, user);
+    }
+
+    return totalDeducted;
+  }
 }
 
 // Singleton instance

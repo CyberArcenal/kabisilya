@@ -29,7 +29,14 @@ const Debt = new EntitySchema({
     status: {
       type: String,
       default: "pending",
-      enum: ["pending", "partially_paid", "paid", "cancelled", "overdue", "settled"]
+      enum: [
+        "pending",
+        "partially_paid",
+        "paid",
+        "cancelled",
+        "overdue",
+        "settled",
+      ],
     },
     dateIncurred: { type: Date, createDate: true },
     dueDate: { type: Date, nullable: true },
@@ -54,8 +61,19 @@ const Debt = new EntitySchema({
     },
     lastPaymentDate: { type: Date, nullable: true },
     createdAt: { type: Date, createDate: true },
-      deletedAt: { type: Date, nullable: true },
+    deletedAt: { type: Date, nullable: true },
     updatedAt: { type: Date, updateDate: true },
+    interestCalculationPeriod: {
+      type: String,
+      length: 20,
+      default: "per_annum",
+      nullable: false,
+      enum: ["per_annum", "per_month"],
+    },
+    lastInterestAccrualDate: {
+      type: Date,
+      nullable: true,
+    },
   },
   relations: {
     worker: {
@@ -75,6 +93,12 @@ const Debt = new EntitySchema({
     },
     history: {
       target: "DebtHistory",
+      type: "one-to-many",
+      inverseSide: "debt",
+      cascade: true,
+    },
+    debtPayments: {
+      target: "DebtPayment",
       type: "one-to-many",
       inverseSide: "debt",
       cascade: true,

@@ -2,7 +2,7 @@
 import type { DebtHistory } from "../../../api/core/debt_history";
 
 export interface DebtHistoryWithDetails extends DebtHistory {
-  // additional fields if needed
+  // additional fields if needed – wala nang payment
 }
 
 export interface DebtHistoryFilters {
