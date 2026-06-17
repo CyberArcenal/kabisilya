@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 interface PaginationProps {
+  variant?: "default" | "compact";
   currentPage: number;
   totalItems: number;
   pageSize: number;
@@ -17,6 +18,7 @@ interface PaginationProps {
 }
 
 const Pagination: React.FC<PaginationProps> = ({
+  variant = "default",
   currentPage,
   totalItems,
   pageSize,
@@ -72,17 +74,28 @@ const Pagination: React.FC<PaginationProps> = ({
 
   if (totalPages <= 1 && !showPageSize) return null;
 
+  const wrapperClasses =
+    variant === "compact"
+      ? "flex flex-col sm:flex-row items-center justify-between gap-4"
+      : "flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 px-2 py-3 bg-[var(--card-bg)] border border-[var(--border-color)]/20 rounded-lg";
+
   return (
-    <div
-      ref={containerRef}
-      className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 px-2 py-3 bg-[var(--card-bg)] border border-[var(--border-color)]/20 rounded-lg"
-    >
+    <div ref={containerRef} className={wrapperClasses}>
       {/* Items info */}
       <div className="text-sm text-[var(--text-secondary)] order-2 sm:order-1">
         Showing{" "}
-        <span className="font-medium text-[var(--text-primary)]">{startItem}</span> to{" "}
-        <span className="font-medium text-[var(--text-primary)]">{endItem}</span> of{" "}
-        <span className="font-medium text-[var(--text-primary)]">{totalItems}</span> items
+        <span className="font-medium text-[var(--text-primary)]">
+          {startItem}
+        </span>{" "}
+        to{" "}
+        <span className="font-medium text-[var(--text-primary)]">
+          {endItem}
+        </span>{" "}
+        of{" "}
+        <span className="font-medium text-[var(--text-primary)]">
+          {totalItems}
+        </span>{" "}
+        items
       </div>
 
       {/* Pagination controls */}

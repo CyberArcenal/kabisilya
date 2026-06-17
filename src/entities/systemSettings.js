@@ -11,6 +11,7 @@ const SettingType = {
   FARM_PAYMENT: "farm_payment",
   FARM_DEBT: "farm_debt",
   FARM_AUDIT: "farm_audit",
+  FARM_NOTIFICATIONS: "farm_notifications",
 };
 
 const SystemSetting = new EntitySchema({

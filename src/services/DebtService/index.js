@@ -569,6 +569,7 @@ class DebtService {
       debtRepo: this._getRepo(qr, require("../../entities/Debt")),
       historyRepo: this._getRepo(qr, require("../../entities/DebtHistory")),
       paymentRepo: this._getRepo(qr, require("../../entities/Payment")),
+      debtPaymentRepo: this._getRepo(qr, require("../../entities/DebtPayment")),
       debtPaymentService: this.debtPaymentService,
       updateDb: require("../../utils/dbUtils/dbActions").updateDb,
       saveDb: require("../../utils/dbUtils/dbActions").saveDb,

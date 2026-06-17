@@ -9,7 +9,18 @@ import TopPerformersTable from "./components/TopPerformersTable";
 import PitakPerformanceTable from "./components/PitakPerformanceTable";
 
 const PitakProductivityPage: React.FC = () => {
-  const { loading, overview, pitaks, topPerformers, page, totalPages, setPage } = usePitakProductivity();
+  const {
+    loading,
+    overview,
+    pitaks,
+    topPerformers,
+    page,
+    totalPages,
+    pageSize,
+    totalItems,
+    setPage,
+    setPageSize,
+  } = usePitakProductivity();
 
   if (loading) {
     return (
@@ -62,7 +73,7 @@ const PitakProductivityPage: React.FC = () => {
         />
         <KPICard
           title="Total Completed Luwang"
-          value={overview?.totalCompletedLuwang || 0}
+          value={overview?.totalCompletedLuwang.toFixed(2) || 0}
           icon={<LayoutGrid className="w-5 h-5" />}
           color="#14b8a6"
         />
@@ -81,7 +92,15 @@ const PitakProductivityPage: React.FC = () => {
         </div>
         <PitakPerformanceTable pitaks={pitaks} />
         <div className="px-6 py-4 border-t border-[var(--border-color)]">
-          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination
+            currentPage={page}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+            showPageSize={true}
+          />
         </div>
       </div>
     </div>

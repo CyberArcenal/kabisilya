@@ -1,5 +1,5 @@
 // src/renderer/pages/finance/debts/index.tsx
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   Filter,
@@ -20,6 +20,7 @@ import ViewDebtModal from "./components/ViewDebtModal";
 import RecordPaymentModal from "./components/RecordPaymentModal";
 import DebtSummaryCards from "./components/DebtSummaryCards";
 import BulkActionsBar from "./components/BulkActionsBar";
+import { usePagination } from "../../../contexts/PaginationContext";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -90,6 +91,71 @@ const DebtManagementPage: React.FC = () => {
     filters.minAmount !== undefined ||
     filters.maxAmount !== undefined
   );
+
+    const { setPagination, clearPagination } = usePagination();
+  
+    // Stable callbacks – they depend on setPage/setLimit which should be stable
+    const handlePageChange = useCallback(
+      (newPage: number) => {
+        setPage(newPage);
+      },
+      [setPage],
+    );
+  
+    const handlePageSizeChange = useCallback(
+      (newSize: number) => {
+        setLimit(newSize);
+        setPage(1);
+      },
+      [setLimit, setPage],
+    );
+  
+    // Store the latest handlers in a ref so the effect can always use the current ones
+    const handlersRef = useRef({
+      onPageChange: handlePageChange,
+      onPageSizeChange: handlePageSizeChange,
+    });
+    useEffect(() => {
+      handlersRef.current = {
+        onPageChange: handlePageChange,
+        onPageSizeChange: handlePageSizeChange,
+      };
+    }, [handlePageChange, handlePageSizeChange]);
+  
+    // Track previous primitive values to avoid unnecessary updates
+    const prevPageRef = useRef(page);
+    const prevTotalRef = useRef(totalCount);
+    const prevLimitRef = useRef(limit);
+  
+    // Effect that only runs when primitive pagination data changes
+    useEffect(() => {
+      const pageChanged = prevPageRef.current !== page;
+      const totalChanged = prevTotalRef.current !== totalCount;
+      const limitChanged = prevLimitRef.current !== limit;
+  
+      if (pageChanged || totalChanged || limitChanged) {
+        // Update refs
+        prevPageRef.current = page;
+        prevTotalRef.current = totalCount;
+        prevLimitRef.current = limit;
+  
+        // Call setPagination with current primitives and the latest handlers from ref
+        setPagination({
+          currentPage: page,
+          totalItems: totalCount,
+          pageSize: limit,
+          onPageChange: handlersRef.current.onPageChange,
+          onPageSizeChange: handlersRef.current.onPageSizeChange,
+          pageSizeOptions: [10, 25, 50, 100],
+          showPageSize: true,
+        });
+      }
+    }, [page, totalCount, limit, setPagination]); // Only these dependencies matter
+  
+    // Clear pagination on unmount
+    useEffect(() => {
+      return () => clearPagination();
+    }, [clearPagination]);
 
   return (
     <div className="p-6 space-y-4">
@@ -306,15 +372,6 @@ const DebtManagementPage: React.FC = () => {
             onSelectAll={(checked) => {
               setSelectedIds(checked ? debts.map((d) => d.id) : []);
             }}
-          />
-          <Pagination
-            currentPage={page}
-            totalItems={totalCount}
-            pageSize={limit}
-            onPageChange={setPage}
-            onPageSizeChange={setLimit}
-            pageSizeOptions={[10, 25, 50, 100]}
-            showPageSize={true}
           />
         </>
       )}

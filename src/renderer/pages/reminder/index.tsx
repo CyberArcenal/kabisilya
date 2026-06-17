@@ -1,5 +1,5 @@
 // src/renderer/pages/system/reminderLog/index.tsx
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Filter, RefreshCw, Mail } from "lucide-react";
 import { dialogs } from "../../utils/dialogs";
 import reminderLogAPI from "../../api/core/reminder_log";
@@ -12,9 +12,14 @@ import { NotificationSearch } from "./components/reminderSearch";
 import { NotificationFilterPanel } from "./components/reminderFilterPannel";
 import { NotificationTable } from "./components/reminderTable";
 import { NotificationViewDialog } from "./components/reminderViewDialogs";
+import { usePagination } from "../../contexts/PaginationContext";
 
 const ReminderLogPage: React.FC = () => {
   const {
+    limit,
+    setLimit,
+    totalCount,
+    page,
     logs,
     pagination,
     stats,
@@ -145,6 +150,71 @@ const ReminderLogPage: React.FC = () => {
       });
   };
 
+    const { setPagination, clearPagination } = usePagination();
+  
+    // Stable callbacks – they depend on setPage/setLimit which should be stable
+    const handlePageChange = useCallback(
+      (newPage: number) => {
+        setPage(newPage);
+      },
+      [setPage],
+    );
+  
+    const handlePageSizeChange = useCallback(
+      (newSize: number) => {
+        setLimit(newSize);
+        setPage(1);
+      },
+      [setLimit, setPage],
+    );
+  
+    // Store the latest handlers in a ref so the effect can always use the current ones
+    const handlersRef = useRef({
+      onPageChange: handlePageChange,
+      onPageSizeChange: handlePageSizeChange,
+    });
+    useEffect(() => {
+      handlersRef.current = {
+        onPageChange: handlePageChange,
+        onPageSizeChange: handlePageSizeChange,
+      };
+    }, [handlePageChange, handlePageSizeChange]);
+  
+    // Track previous primitive values to avoid unnecessary updates
+    const prevPageRef = useRef(page);
+    const prevTotalRef = useRef(totalCount);
+    const prevLimitRef = useRef(limit);
+  
+    // Effect that only runs when primitive pagination data changes
+    useEffect(() => {
+      const pageChanged = prevPageRef.current !== page;
+      const totalChanged = prevTotalRef.current !== totalCount;
+      const limitChanged = prevLimitRef.current !== limit;
+  
+      if (pageChanged || totalChanged || limitChanged) {
+        // Update refs
+        prevPageRef.current = page;
+        prevTotalRef.current = totalCount;
+        prevLimitRef.current = limit;
+  
+        // Call setPagination with current primitives and the latest handlers from ref
+        setPagination({
+          currentPage: page,
+          totalItems: totalCount,
+          pageSize: limit,
+          onPageChange: handlersRef.current.onPageChange,
+          onPageSizeChange: handlersRef.current.onPageSizeChange,
+          pageSizeOptions: [10, 25, 50, 100],
+          showPageSize: true,
+        });
+      }
+    }, [page, totalCount, limit, setPagination]); // Only these dependencies matter
+  
+    // Clear pagination on unmount
+    useEffect(() => {
+      return () => clearPagination();
+    }, [clearPagination]);
+
   return (
     <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -228,20 +298,6 @@ const ReminderLogPage: React.FC = () => {
           sendingIds={sendingRows}
         />
       </div>
-
-      {!loading && pagination.total > 0 && (
-        <div className="mt-6">
-          <Pagination
-            currentPage={pagination.page}
-            totalItems={pagination.total}
-            pageSize={pagination.limit}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            pageSizeOptions={[10, 25, 50, 100]}
-            showPageSize={true}
-          />
-        </div>
-      )}
 
       {selectedLog && (
         <NotificationViewDialog

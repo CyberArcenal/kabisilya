@@ -24,7 +24,7 @@ export const aggregateByWorker = (payments: Payment[]): WorkerPaymentSummary[] =
 
     if (existing) {
       existing.totalGross += p.grossPay;
-      existing.totalDebtDeduction += p.totalDebtDeduction || 0;
+      existing.totalDebtDeduction += p.debtDeductionTotal || 0;
       existing.totalNet += p.netPay;
       existing.totalPaid += p.amountPaid || 0;
       existing.paymentCount += 1;
@@ -35,7 +35,7 @@ export const aggregateByWorker = (payments: Payment[]): WorkerPaymentSummary[] =
         workerId: p.worker.id,
         workerName: p.worker.name,
         totalGross: p.grossPay,
-        totalDebtDeduction: p.totalDebtDeduction || 0,
+        totalDebtDeduction: p.debtDeductionTotal || 0,
         totalNet: p.netPay,
         totalPaid: p.amountPaid || 0,
         paymentCount: 1,

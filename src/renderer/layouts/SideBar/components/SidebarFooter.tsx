@@ -14,7 +14,7 @@ const SidebarFooter: React.FC<SidebarFooterProps> = ({ isOpen }) => {
 
   return (
     <>
-      <div className="p-4 border-t border-[var(--sidebar-border)] text-center flex-shrink-0 rounded-br-3xl">
+      <div className="p-5 border-t border-[var(--sidebar-border)] text-center flex-shrink-0 rounded-br-3xl">
         {isOpen ? (
           <p className="text-xs text-[var(--sidebar-text)] opacity-70">
             {version} • © {currentYear} {title}

@@ -11,17 +11,21 @@ export const useBukidReports = () => {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [productionData, setProductionData] = useState<ProductionDataPoint[]>([]);
   const [pitakSummary, setPitakSummary] = useState<PitakSummary[]>([]);
+
+  // Pagination state
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Derived pagination values
+  const totalItems = pitakSummary.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch bukid stats (total bukids, active, etc.)
       const bukidStatsRes = await bukidAPI.getStats();
-      // Fetch all pitaks to calculate summary
       const pitaksRes = await pitakAPI.getAll({ limit: 1000 });
-      // Fetch assignments for last 6 months (for production chart)
+
       const now = new Date();
       const months = [];
       for (let i = 5; i >= 0; i--) {
@@ -48,32 +52,30 @@ export const useBukidReports = () => {
       }
       setProductionData(monthlyData);
 
-      // Prepare pitak summary table
       const pitakList = pitaksRes.status ? pitaksRes.data.items : [];
       const pitakSummaryData: PitakSummary[] = pitakList.map(p => ({
         id: p.id,
         location: p.location,
         totalLuwang: p.totalLuwang || 0,
-        completedLuwang: 0, // would need to fetch assignments per pitak to compute completed luwang
+        completedLuwang: 0,
         completionRate: 0,
         totalAssignments: 0,
         totalPayments: 0,
       }));
-      // For demo, we fill dummy data; in real implementation, fetch assignments for each pitak
       setPitakSummary(pitakSummaryData);
-      setTotalPages(Math.ceil(pitakSummaryData.length / 10));
 
-      // KPI cards
-      const totalBukid = bukidStatsRes.status ? bukidStatsRes.data.totalBukids : 0;
-      const activeBukid = bukidStatsRes.status ? bukidStatsRes.data.statusBreakdown?.active || 0 : 0;
+      // Reset to first page when data changes
+      setPage(1);
+
+      const totalBukid = bukidStatsRes.status ? bukidStatsRes.data.total : 0;
+      const activeBukid = bukidStatsRes.status ? bukidStatsRes.data?.active || 0 : 0;
       const totalPitaks = pitakList.length;
-      const totalAssignments = pitakList.reduce((sum, p) => sum + (p.totalLuwang || 0), 0); // rough
 
       setKpis([
         { title: "Total Farms", value: totalBukid, change: 0, icon: <MapPin className="w-5 h-5" />, color: "#3b82f6" },
         { title: "Active Farms", value: activeBukid, change: 0, icon: <Sprout className="w-5 h-5" />, color: "#10b981" },
         { title: "Total Plots", value: totalPitaks, change: 0, icon: <Wheat className="w-5 h-5" />, color: "#f59e0b" },
-        { title: "Total Luwang", value: totalAssignments, change: 0, icon: <Users className="w-5 h-5" />, color: "#8b5cf6" },
+        { title: "Total Luwang", value: totalPitaks, change: 0, icon: <Users className="w-5 h-5" />, color: "#8b5cf6" },
       ]);
     } catch (error) {
       console.error("Failed to fetch bukid reports", error);
@@ -81,6 +83,11 @@ export const useBukidReports = () => {
       setLoading(false);
     }
   }, []);
+
+  // Reset page when pageSize changes
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
 
   useEffect(() => {
     fetchData();
@@ -93,6 +100,9 @@ export const useBukidReports = () => {
     pitakSummary,
     page,
     totalPages,
+    pageSize,
+    totalItems,
     setPage,
+    setPageSize,
   };
 };

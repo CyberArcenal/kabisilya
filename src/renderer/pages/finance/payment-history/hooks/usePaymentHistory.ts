@@ -10,7 +10,7 @@ export const usePaymentHistory = () => {
   const [history, setHistory] = useState<PaymentHistoryWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
@@ -25,7 +25,7 @@ export const usePaymentHistory = () => {
     try {
       const params: any = {
         page,
-        limit: pageSize,
+        limit: limit,
         sortBy: "changeDate",
         sortOrder: "DESC",
       };
@@ -46,7 +46,7 @@ export const usePaymentHistory = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, paymentId, actionType, startDate, endDate]);
+  }, [page, limit, paymentId, actionType, startDate, endDate]);
 
   useEffect(() => {
     fetchHistory();
@@ -105,12 +105,12 @@ export const usePaymentHistory = () => {
     history,
     loading,
     page,
-    pageSize,
+    limit,
     totalCount,
     totalPages,
     filters: { paymentId, actionType, startDate, endDate },
     setPage,
-    setPageSize,
+    setLimit,
     setPaymentId,
     setActionType,
     setStartDate,

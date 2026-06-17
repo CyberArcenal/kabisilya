@@ -1,6 +1,15 @@
 // src/renderer/pages/system/sessions/index.tsx
-import React, { useState } from "react";
-import { Plus, Filter, X, RefreshCw, Eye, EyeOff, Download } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Plus,
+  Filter,
+  X,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Download,
+  GitBranch,
+} from "lucide-react";
 import Button from "../../../components/UI/Button";
 import Pagination from "../../../components/UI/Pagination";
 import LoadingSpinner from "../../../components/Shared/LoadingSpinner";
@@ -11,6 +20,8 @@ import ViewSessionModal from "./components/ViewSessionModal";
 import ChangeSessionStatusModal from "./components/ChangeSessionStatusModal";
 import SessionSummaryCards from "./components/SessionSummaryCards";
 import BulkActionsBar from "./components/BulkActionsBar";
+import { usePagination } from "../../../contexts/PaginationContext";
+import CopyFarmStructureModal from "./components/CopyFarmStructureModal";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -63,46 +74,200 @@ const SessionsPage: React.FC = () => {
   const [showStats, setShowStats] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const hasFilters = !!(filters.search || filters.status);
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const { setPagination, clearPagination } = usePagination();
+
+  // Stable callbacks – they depend on setPage/setLimit which should be stable
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      setPage(newPage);
+    },
+    [setPage],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (newSize: number) => {
+      setLimit(newSize);
+      setPage(1);
+    },
+    [setLimit, setPage],
+  );
+
+  // Store the latest handlers in a ref so the effect can always use the current ones
+  const handlersRef = useRef({
+    onPageChange: handlePageChange,
+    onPageSizeChange: handlePageSizeChange,
+  });
+
+  useEffect(() => {
+    handlersRef.current = {
+      onPageChange: handlePageChange,
+      onPageSizeChange: handlePageSizeChange,
+    };
+  }, [handlePageChange, handlePageSizeChange]);
+
+  // Track previous primitive values to avoid unnecessary updates
+  const prevPageRef = useRef(page);
+  const prevTotalRef = useRef(totalCount);
+  const prevLimitRef = useRef(limit);
+
+  // Effect that only runs when primitive pagination data changes
+  useEffect(() => {
+    const pageChanged = prevPageRef.current !== page;
+    const totalChanged = prevTotalRef.current !== totalCount;
+    const limitChanged = prevLimitRef.current !== limit;
+
+    if (pageChanged || totalChanged || limitChanged) {
+      // Update refs
+      prevPageRef.current = page;
+      prevTotalRef.current = totalCount;
+      prevLimitRef.current = limit;
+
+      // Call setPagination with current primitives and the latest handlers from ref
+      setPagination({
+        currentPage: page,
+        totalItems: totalCount,
+        pageSize: limit,
+        onPageChange: handlersRef.current.onPageChange,
+        onPageSizeChange: handlersRef.current.onPageSizeChange,
+        pageSizeOptions: [10, 25, 50, 100],
+        showPageSize: true,
+      });
+    }
+  }, [page, totalCount, limit, setPagination]); // Only these dependencies matter
+
+  // Clear pagination on unmount
+  useEffect(() => {
+    return () => clearPagination();
+  }, [clearPagination]);
 
   return (
     <div className="p-6 space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Session Management</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Manage farming seasons / sessions</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Session Management
+          </h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Manage farming seasons / sessions
+          </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowStats(!showStats)} className="p-2 rounded-md hover:bg-[var(--card-hover-bg)]" title={showStats ? "Hide summary" : "Show summary"}>
-            {showStats ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)]"
+            title={showStats ? "Hide summary" : "Show summary"}
+          >
+            {showStats ? (
+              <EyeOff className="w-4 h-4" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
           </button>
-          <button onClick={() => setShowFilters(!showFilters)} className="p-2 rounded-md hover:bg-[var(--card-hover-bg)]" title={showFilters ? "Hide filters" : "Show filters"}>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)]"
+            title={showFilters ? "Hide filters" : "Show filters"}
+          >
             <Filter className="w-4 h-4" />
           </button>
-          <button onClick={exportToCSV} className="p-2 rounded-md hover:bg-[var(--card-hover-bg)]" title="Export all sessions">
+          <button
+            onClick={exportToCSV}
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)]"
+            title="Export all sessions"
+          >
             <Download className="w-4 h-4" />
           </button>
-          <button onClick={refetch} disabled={loading} className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] disabled:opacity-50" title="Refresh">
+          <button
+            onClick={refetch}
+            disabled={loading}
+            className="p-2 rounded-md hover:bg-[var(--card-hover-bg)] disabled:opacity-50"
+            title="Refresh"
+          >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <Button variant="primary" size="sm" icon={Plus} onClick={handleAddNew}>Add Session</Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={GitBranch}
+            onClick={() => setCopyModalOpen(true)}
+          >
+            Copy Structure
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={handleAddNew}
+          >
+            Add Session
+          </Button>
         </div>
       </div>
 
       {/* Summary Cards */}
-      {showStats && <SessionSummaryCards total={stats.total} active={stats.active} closed={stats.closed} archived={stats.archived} />}
+      {showStats && (
+        <SessionSummaryCards
+          total={stats.total}
+          active={stats.active}
+          closed={stats.closed}
+          archived={stats.archived}
+        />
+      )}
 
       {/* Filters Bar */}
       {showFilters && (
         <div className="bg-[var(--card-bg)] rounded-xl p-4 border border-[var(--border-color)] space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]"><Filter className="w-4 h-4" /> Filters</div>
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+            <Filter className="w-4 h-4" /> Filters
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <input type="text" placeholder="Search by name..." value={filters.search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]" style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }} />
-            <select value={filters.status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]" style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}>
-              {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            <input
+              type="text"
+              placeholder="Search by name..."
+              value={filters.search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            />
+            <select
+              value={filters.status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {statusOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
-          {hasFilters && <div className="flex justify-end"><button onClick={resetFilters} className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1"><X className="w-3 h-3" /> Clear all filters</button></div>}
+          {hasFilters && (
+            <div className="flex justify-end">
+              <button
+                onClick={resetFilters}
+                className="text-xs text-[var(--primary-color)] hover:underline flex items-center gap-1"
+              >
+                <X className="w-3 h-3" /> Clear all filters
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -110,7 +275,9 @@ const SessionsPage: React.FC = () => {
       {selectedIds.length > 0 && (
         <BulkActionsBar
           selectedCount={selectedIds.length}
-          onStatusChange={(newStatus) => bulkStatusChange(selectedIds, newStatus)}
+          onStatusChange={(newStatus) =>
+            bulkStatusChange(selectedIds, newStatus)
+          }
           onDelete={() => bulkDelete(selectedIds)}
           onExport={bulkExport}
           onClearSelection={() => setSelectedIds([])}
@@ -119,7 +286,9 @@ const SessionsPage: React.FC = () => {
 
       {/* Table */}
       {loading ? (
-        <div className="flex justify-center py-12"><LoadingSpinner size="medium" /></div>
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="medium" />
+        </div>
       ) : (
         <>
           <SessionTable
@@ -133,25 +302,42 @@ const SessionsPage: React.FC = () => {
             sortBy={sortBy}
             sortOrder={sortOrder}
             selectedIds={selectedIds}
-            onSelectRow={(id, checked) => { setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id)); }}
-            onSelectAll={(checked) => { setSelectedIds(checked ? sessions.map(s => s.id) : []); }}
-          />
-          <Pagination
-            currentPage={page}
-            totalItems={totalCount}
-            pageSize={limit}
-            onPageChange={setPage}
-            onPageSizeChange={setLimit}
-            pageSizeOptions={[10, 25, 50, 100]}
-            showPageSize={true}
+            onSelectRow={(id, checked) => {
+              setSelectedIds((prev) =>
+                checked ? [...prev, id] : prev.filter((i) => i !== id),
+              );
+            }}
+            onSelectAll={(checked) => {
+              setSelectedIds(checked ? sessions.map((s) => s.id) : []);
+            }}
           />
         </>
       )}
 
       {/* Modals */}
-      <ViewSessionModal isOpen={viewModal.isOpen} onClose={viewModal.close} session={selectedSession} />
-      <CreateSessionModal isOpen={formModal.isOpen} onClose={formModal.close} onSuccess={handleFormSuccess} initialData={editingSession} />
-      <ChangeSessionStatusModal isOpen={statusModal.isOpen} onClose={statusModal.close} sessionName={statusChangeSession?.name || ""} currentStatus={statusChangeSession?.status || ""} onConfirm={handleConfirmStatusChange} />
+      <ViewSessionModal
+        isOpen={viewModal.isOpen}
+        onClose={viewModal.close}
+        session={selectedSession}
+      />
+      <CreateSessionModal
+        isOpen={formModal.isOpen}
+        onClose={formModal.close}
+        onSuccess={handleFormSuccess}
+        initialData={editingSession}
+      />
+      <CopyFarmStructureModal
+        isOpen={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        onSuccess={refetch}
+      />
+      <ChangeSessionStatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        sessionName={statusChangeSession?.name || ""}
+        currentStatus={statusChangeSession?.status || ""}
+        onConfirm={handleConfirmStatusChange}
+      />
     </div>
   );
 };

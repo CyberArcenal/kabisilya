@@ -52,7 +52,7 @@ export interface GroupedSettingsData {
   grouped_settings: {
     general: GeneralSettings;
     farm_session: FarmSessionSettings;
-    notification: FarmNotificationsSettings;
+    farm_notifications: FarmNotificationsSettings;
     farm_bukid: FarmBukidSettings;
     farm_pitak: FarmPitakSettings;
     farm_assignment: FarmAssignmentSettings;

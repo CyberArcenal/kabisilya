@@ -6,7 +6,7 @@ export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [filters, setFilters] = useState<NotificationFilters>({
@@ -71,6 +71,8 @@ export const useNotifications = () => {
   };
 
   return {
+    limit,
+    setLimit,
     notifications,
     loading,
     page,

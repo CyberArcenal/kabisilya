@@ -9,8 +9,7 @@ export const useWorkerPerformance = () => {
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const [performance, setPerformance] = useState<WorkerPerformanceRow[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [dateRange, setDateRange] = useState({
     startDate: getDefaultStartDate(),
     endDate: getDefaultEndDate(),
@@ -26,6 +25,11 @@ export const useWorkerPerformance = () => {
     return d.toISOString().split("T")[0];
   }
 
+  // Reset page when pageSize changes
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -39,20 +43,17 @@ export const useWorkerPerformance = () => {
       ]);
       if (overviewRes.status) setOverview(overviewRes.data);
       if (topPerformersRes.status) {
-        // topPerformersRes.data.performers is the array
         setTopPerformers(topPerformersRes.data.performers || []);
       }
       if (performanceRes.status) {
         setPerformance(performanceRes.data.performance || []);
-        const total = performanceRes.data.performance?.length || 0;
-        setTotalPages(Math.ceil(total / pageSize));
       }
     } catch (error) {
       console.error("Failed to fetch worker performance", error);
     } finally {
       setLoading(false);
     }
-  }, [dateRange, pageSize]);
+  }, [dateRange]);
 
   useEffect(() => {
     fetchData();
@@ -63,6 +64,8 @@ export const useWorkerPerformance = () => {
     setPage(1);
   };
 
+  const totalItems = performance.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
   const paginatedPerformance = performance.slice((page - 1) * pageSize, page * pageSize);
 
   return {
@@ -73,8 +76,11 @@ export const useWorkerPerformance = () => {
     allPerformance: performance,
     page,
     totalPages,
+    totalItems,
+    pageSize,
     dateRange,
     setPage,
+    setPageSize,
     updateDateRange,
     refresh: fetchData,
   };

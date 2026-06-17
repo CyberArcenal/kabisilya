@@ -1,10 +1,11 @@
 // src/renderer/pages/finance/debt-history/index.tsx
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Filter, X, RefreshCw, Download, Eye, EyeOff } from "lucide-react";
 import Pagination from "../../../components/UI/Pagination";
 import LoadingSpinner from "../../../components/Shared/LoadingSpinner";
 import { useDebtHistory } from "./hooks/useDebtHistory";
 import DebtHistoryTable from "./components/DebtHistoryTable";
+import { usePagination } from "../../../contexts/PaginationContext";
 
 const transactionTypeOptions = [
   { value: "", label: "All Types" },
@@ -16,14 +17,14 @@ const transactionTypeOptions = [
 
 const DebtHistoryPage: React.FC = () => {
   const {
+    limit,
+    setLimit,
     history,
     loading,
     page,
-    pageSize,
     totalCount,
     filters,
     setPage,
-    setPageSize,
     setDebtId,
     setTransactionType,
     setStartDate,
@@ -51,6 +52,71 @@ const DebtHistoryPage: React.FC = () => {
   const totalRecords = totalCount;
   const totalAmountPaid = history.reduce((sum, item) => sum + item.amountPaid, 0);
   const avgPayment = history.length > 0 ? totalAmountPaid / history.length : 0;
+
+    const { setPagination, clearPagination } = usePagination();
+  
+    // Stable callbacks – they depend on setPage/setLimit which should be stable
+    const handlePageChange = useCallback(
+      (newPage: number) => {
+        setPage(newPage);
+      },
+      [setPage],
+    );
+  
+    const handlePageSizeChange = useCallback(
+      (newSize: number) => {
+        setLimit(newSize);
+        setPage(1);
+      },
+      [setLimit, setPage],
+    );
+  
+    // Store the latest handlers in a ref so the effect can always use the current ones
+    const handlersRef = useRef({
+      onPageChange: handlePageChange,
+      onPageSizeChange: handlePageSizeChange,
+    });
+    useEffect(() => {
+      handlersRef.current = {
+        onPageChange: handlePageChange,
+        onPageSizeChange: handlePageSizeChange,
+      };
+    }, [handlePageChange, handlePageSizeChange]);
+  
+    // Track previous primitive values to avoid unnecessary updates
+    const prevPageRef = useRef(page);
+    const prevTotalRef = useRef(totalCount);
+    const prevLimitRef = useRef(limit);
+  
+    // Effect that only runs when primitive pagination data changes
+    useEffect(() => {
+      const pageChanged = prevPageRef.current !== page;
+      const totalChanged = prevTotalRef.current !== totalCount;
+      const limitChanged = prevLimitRef.current !== limit;
+  
+      if (pageChanged || totalChanged || limitChanged) {
+        // Update refs
+        prevPageRef.current = page;
+        prevTotalRef.current = totalCount;
+        prevLimitRef.current = limit;
+  
+        // Call setPagination with current primitives and the latest handlers from ref
+        setPagination({
+          currentPage: page,
+          totalItems: totalCount,
+          pageSize: limit,
+          onPageChange: handlersRef.current.onPageChange,
+          onPageSizeChange: handlersRef.current.onPageSizeChange,
+          pageSizeOptions: [10, 25, 50, 100],
+          showPageSize: true,
+        });
+      }
+    }, [page, totalCount, limit, setPagination]); // Only these dependencies matter
+  
+    // Clear pagination on unmount
+    useEffect(() => {
+      return () => clearPagination();
+    }, [clearPagination]);
 
   return (
     <div className="p-6 space-y-6 animate-fadeIn">
@@ -231,20 +297,6 @@ const DebtHistoryPage: React.FC = () => {
       ) : (
         <>
           <DebtHistoryTable history={history} />
-          <div className="mt-4 flex flex-wrap justify-between items-center gap-2">
-            <div className="text-xs text-[var(--text-tertiary)]">
-              Showing {history.length} of {totalCount} record{totalCount !== 1 ? "s" : ""}
-            </div>
-            <Pagination
-              currentPage={page}
-              totalItems={totalCount}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              pageSizeOptions={[5, 10, 25, 50]}
-              showPageSize
-            />
-          </div>
         </>
       )}
     </div>

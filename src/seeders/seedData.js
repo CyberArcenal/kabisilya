@@ -13,7 +13,7 @@ const Worker = require("../entities/Worker");
 const Assignment = require("../entities/Assignment");
 const Debt = require("../entities/Debt");
 const DebtHistory = require("../entities/DebtHistory");
-const DebtPayment = require("../entities/DebtPayment"); // ✅ BAGO
+const DebtPayment = require("../entities/DebtPayment");
 const Payment = require("../entities/Payment");
 const PaymentHistory = require("../entities/PaymentHistory");
 
@@ -65,7 +65,7 @@ async function createSeedDataSource() {
       Assignment,
       Debt,
       DebtHistory,
-      DebtPayment, // ✅ BAGO
+      DebtPayment,
       Payment,
       PaymentHistory,
       SystemSetting,
@@ -109,7 +109,7 @@ async function seedData() {
       const assignmentRepo = seedDataSource.getRepository(Assignment);
       const debtRepo = seedDataSource.getRepository(Debt);
       const debtHistoryRepo = seedDataSource.getRepository(DebtHistory);
-      const debtPaymentRepo = seedDataSource.getRepository(DebtPayment); // ✅ BAGO
+      const debtPaymentRepo = seedDataSource.getRepository(DebtPayment);
       const paymentRepo = seedDataSource.getRepository(Payment);
       const paymentHistoryRepo = seedDataSource.getRepository(PaymentHistory);
       const systemSettingRepo = seedDataSource.getRepository(SystemSetting);
@@ -484,7 +484,6 @@ async function seedData() {
                 new Date(),
               ),
               debt,
-              // ❌ Wala nang payment: payment,
             });
           }
         }
@@ -492,50 +491,13 @@ async function seedData() {
       const savedDebtHistories = await debtHistoryRepo.save(debtHistories);
       console.log(`   Created ${savedDebtHistories.length} debt histories`);
 
-      // ------------------------------------------------------------------
-      // 9. DEBT PAYMENTS (link payment at debt)
-      // ------------------------------------------------------------------
-      console.log("🔗 Seeding Debt Payments...");
-      const debtPayments = [];
-      for (const payment of savedPayments) {
-        // Kung may totalDebtDeduction, gumawa ng DebtPayment
-        if (payment.totalDebtDeduction > 0) {
-          // Humanap ng mga utang ng worker na may balance
-          const workerDebts = savedDebts.filter(
-            (d) => d.worker.id === payment.worker.id && d.balance > 0,
-          );
-          if (workerDebts.length === 0) continue;
-          // Mag-allocate ng deduction sa mga utang (FIFO)
-          let remaining = payment.totalDebtDeduction;
-          for (const debt of workerDebts) {
-            if (remaining <= 0) break;
-            const deductAmount = Math.min(remaining, debt.balance);
-            if (deductAmount <= 0) continue;
-            const oldBalance = debt.balance;
-            // Update debt balance (para sa seed, diretso)
-            debt.balance -= deductAmount;
-            if (debt.balance === 0) debt.status = "paid";
-            else if (debt.status !== "partially_paid") debt.status = "partially_paid";
-            // I-save ang debt (kailangan i-update)
-            await debtRepo.save(debt);
-            // Gumawa ng DebtPayment
-            debtPayments.push({
-              payment,
-              debt,
-              amount: deductAmount,
-              previousBalance: oldBalance,
-              newBalance: debt.balance,
-              notes: `Deducted from payment #${payment.id}`,
-            });
-            remaining -= deductAmount;
-          }
-        }
-      }
-      const savedDebtPayments = await debtPaymentRepo.save(debtPayments);
-      console.log(`   Created ${savedDebtPayments.length} debt payments`);
+      // ==================================================================
+      // ❌ INALIS NA ANG PAGGAWA NG DEBTPAYMENT
+      // ==================================================================
+      console.log("🔗 Skipping DebtPayment creation to avoid duplicate links.");
 
       // ------------------------------------------------------------------
-      // 10. PAYMENT HISTORIES
+      // 9. PAYMENT HISTORIES
       // ------------------------------------------------------------------
       console.log("📊 Seeding Payment Histories...");
       const paymentHistories = [];
@@ -574,7 +536,7 @@ async function seedData() {
       );
 
       // ------------------------------------------------------------------
-      // 11. SYSTEM SETTINGS – CLEAR OLD ONES FIRST
+      // 10. SYSTEM SETTINGS – CLEAR OLD ONES FIRST
       // ------------------------------------------------------------------
       console.log("⚙️ Seeding System Settings...");
       await systemSettingRepo.clear();
@@ -642,7 +604,8 @@ async function seedData() {
       console.log(`   Assignments: ${savedAssignments.length}`);
       console.log(`   Debts: ${savedDebts.length}`);
       console.log(`   Debt Histories: ${savedDebtHistories.length}`);
-      console.log(`   Debt Payments: ${savedDebtPayments.length}`);
+      // ❌ Wala nang Debt Payments sa summary
+      console.log(`   Debt Payments: 0 (skipped)`);
       console.log(`   Payments: ${savedPayments.length}`);
       console.log(`   Payment Histories: ${savedPaymentHistories.length}`);
     } catch (error) {

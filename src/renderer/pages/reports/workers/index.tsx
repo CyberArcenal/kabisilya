@@ -19,8 +19,11 @@ const WorkerPerformancePage: React.FC = () => {
     performance,
     page,
     totalPages,
+    totalItems,
+    pageSize,
     dateRange,
     setPage,
+    setPageSize,
     updateDateRange,
   } = useWorkerPerformance();
 
@@ -115,7 +118,15 @@ const WorkerPerformancePage: React.FC = () => {
         </div>
         <WorkerPerformanceTable workers={performance} />
         <div className="px-6 py-4 border-t border-[var(--border-color)]">
-          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination
+            currentPage={page}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+            showPageSize={true}
+          />
         </div>
       </div>
     </div>

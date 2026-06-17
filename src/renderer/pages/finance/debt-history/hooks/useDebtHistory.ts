@@ -7,7 +7,7 @@ export const useDebtHistory = () => {
   const [history, setHistory] = useState<DebtHistoryWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
@@ -24,7 +24,7 @@ export const useDebtHistory = () => {
     try {
       const params: any = {
         page,
-        limit: pageSize,
+        limit: limit,
         sortBy: "transactionDate",
         sortOrder: "DESC",
       };
@@ -46,7 +46,7 @@ export const useDebtHistory = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, debtId, transactionType, startDate, endDate, minAmount, maxAmount]);
+  }, [page, limit, debtId, transactionType, startDate, endDate, minAmount, maxAmount]);
 
   useEffect(() => {
     fetchHistory();
@@ -107,12 +107,12 @@ export const useDebtHistory = () => {
     history,
     loading,
     page,
-    pageSize,
+    limit,
     totalCount,
     totalPages,
     filters: { debtId, transactionType, startDate, endDate, minAmount, maxAmount },
     setPage,
-    setPageSize,
+    setLimit,
     setDebtId,
     setTransactionType,
     setStartDate,

@@ -520,6 +520,204 @@ class SessionService {
     }
     return results;
   }
+
+  /**
+   * Copy farm structure (Bukid, Pitak, and optionally Assignment) from one session to another.
+   * @param {number} sourceSessionId
+   * @param {number} targetSessionId
+   * @param {number[]} bukidIds - optional, if provided, only these bukids are copied; if empty, copies all.
+   * @param {Object} options
+   * @param {boolean} options.includeAssignments - if true, copies assignments as well.
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr - optional, if not provided, creates its own transaction.
+   * @returns {Promise<Object>} summary of copied entities.
+   */
+  async copyFarmStructure(
+    sourceSessionId,
+    targetSessionId,
+    bukidIds = [],
+    options = { includeAssignments: false },
+    user = "system",
+    qr = null,
+  ) {
+    const { saveDb } = require("../utils/dbUtils/dbActions");
+    const Session = require("../entities/Session");
+    const Bukid = require("../entities/Bukid");
+    const Pitak = require("../entities/Pitak");
+    const Assignment = require("../entities/Assignment");
+
+    const sessionRepo = this._getRepo(qr, Session);
+    const bukidRepo = this._getRepo(qr, Bukid);
+    const pitakRepo = this._getRepo(qr, Pitak);
+    const assignmentRepo = this._getRepo(qr, Assignment);
+
+    // 1. Validate sessions
+    const sourceSession = await sessionRepo.findOne({
+      where: { id: sourceSessionId, deletedAt: null },
+    });
+    if (!sourceSession) {
+      throw new Error(`Source session with ID ${sourceSessionId} not found`);
+    }
+
+    const targetSession = await sessionRepo.findOne({
+      where: { id: targetSessionId, deletedAt: null },
+    });
+    if (!targetSession) {
+      throw new Error(`Target session with ID ${targetSessionId} not found`);
+    }
+
+    if (targetSession.status !== "active") {
+      throw new Error(
+        `Cannot copy farm structure to a "${targetSession.status}" session. ` +
+          `Only active sessions can accept new data. Please set the target session to "active" first.`,
+      );
+    }
+
+    // 2. Fetch source Bukids with their Pitaks and optionally Assignments
+    const sourceBukidsQuery = bukidRepo
+      .createQueryBuilder("bukid")
+      .leftJoinAndSelect("bukid.pitaks", "pitak")
+      .where("bukid.sessionId = :sourceSessionId", { sourceSessionId })
+      .andWhere("bukid.deletedAt IS NULL");
+
+    if (bukidIds && bukidIds.length > 0) {
+      sourceBukidsQuery.andWhere("bukid.id IN (:...bukidIds)", { bukidIds });
+    }
+
+    let sourceBukids = await sourceBukidsQuery.getMany();
+
+    if (options.includeAssignments) {
+      // Load assignments for each pitak
+      const pitakIds = sourceBukids.flatMap((b) => b.pitaks.map((p) => p.id));
+      if (pitakIds.length > 0) {
+        const assignments = await assignmentRepo
+          .createQueryBuilder("assignment")
+          .leftJoinAndSelect("assignment.worker", "worker")
+          .where("assignment.pitakId IN (:...pitakIds)", { pitakIds })
+          .andWhere("assignment.deletedAt IS NULL")
+          .getMany();
+        // Group assignments by pitak ID
+        const assignmentMap = new Map();
+        for (const a of assignments) {
+          if (!assignmentMap.has(a.pitakId)) assignmentMap.set(a.pitakId, []);
+          assignmentMap.get(a.pitakId).push(a);
+        }
+        // Attach to pitaks
+        for (const bukid of sourceBukids) {
+          for (const pitak of bukid.pitaks) {
+            pitak._assignments = assignmentMap.get(pitak.id) || [];
+          }
+        }
+      }
+    }
+
+    if (sourceBukids.length === 0) {
+      throw new Error("No Bukids found to copy");
+    }
+
+    // 3. Begin transaction if not provided
+    let queryRunner = qr;
+    if (!queryRunner) {
+      queryRunner =
+        this.sessionRepository.manager.connection.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+    }
+
+    try {
+      // Map old pitak ID -> new pitak ID
+      const pitakIdMap = new Map();
+      const copiedBukids = [];
+      const copiedPitaks = [];
+      const copiedAssignments = [];
+
+      // 4. Copy Bukids
+      for (const sourceBukid of sourceBukids) {
+        const newBukid = bukidRepo.create({
+          name: sourceBukid.name,
+          status: 'active',
+          notes: sourceBukid.notes,
+          location: sourceBukid.location,
+          session: targetSession,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        const savedBukid = await saveDb(bukidRepo, newBukid, { queryRunner });
+        copiedBukids.push(savedBukid);
+
+        // 5. Copy Pitaks for this Bukid
+        for (const sourcePitak of sourceBukid.pitaks || []) {
+          const newPitak = pitakRepo.create({
+            location: sourcePitak.location,
+            totalLuwang: sourcePitak.totalLuwang,
+            layoutType: sourcePitak.layoutType,
+            sideLengths: sourcePitak.sideLengths,
+            areaSqm: sourcePitak.areaSqm,
+            notes: sourcePitak.notes,
+            status: 'active',
+            bukid: savedBukid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          const savedPitak = await saveDb(pitakRepo, newPitak, { queryRunner });
+          copiedPitaks.push(savedPitak);
+          pitakIdMap.set(sourcePitak.id, savedPitak.id);
+
+          // 6. Copy Assignments (if flag enabled)
+          if (options.includeAssignments && sourcePitak._assignments) {
+            for (const sourceAssignment of sourcePitak._assignments) {
+              const newAssignment = assignmentRepo.create({
+                luwangCount: sourceAssignment.luwangCount,
+                assignmentDate: sourceAssignment.assignmentDate,
+                status: 'active',
+                notes: sourceAssignment.notes,
+                worker: sourceAssignment.worker, // same worker
+                pitak: savedPitak, // new pitak
+                session: targetSession,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+              const savedAssignment = await saveDb(
+                assignmentRepo,
+                newAssignment,
+                { queryRunner },
+              );
+              copiedAssignments.push(savedAssignment);
+            }
+          }
+        }
+      }
+
+      // Commit if we started the transaction
+      if (!qr) {
+        await queryRunner.commitTransaction();
+      }
+
+      return {
+        success: true,
+        copiedBukids: copiedBukids.length,
+        copiedPitaks: copiedPitaks.length,
+        copiedAssignments: copiedAssignments.length,
+        details: {
+          bukids: copiedBukids.map((b) => ({ id: b.id, name: b.name })),
+          pitaks: copiedPitaks.map((p) => ({ id: p.id, location: p.location })),
+          assignments: copiedAssignments.map((a) => ({
+            id: a.id,
+            workerName: a.worker?.name,
+          })),
+        },
+      };
+    } catch (error) {
+      if (!qr) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      if (!qr) {
+        await queryRunner.release();
+      }
+    }
+  }
 }
 
 // Singleton instance

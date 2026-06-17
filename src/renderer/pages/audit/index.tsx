@@ -1,23 +1,24 @@
 // src/renderer/pages/audit/index.tsx
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw, Download, Filter, Eye, EyeOff, FileText } from "lucide-react";
-import Pagination from "../../components/UI/Pagination";
 import LoadingSpinner from "../../components/Shared/LoadingSpinner";
 import { useAuditLogs } from "./hooks/useAuditLogs";
 import AuditFilters from "./components/AuditFilters";
 import AuditTable from "./components/AuditTable";
 import Button from "../../components/UI/Button";
 import { showSuccess } from "../../utils/notification";
+import { usePagination } from "../../contexts/PaginationContext";
 
 const AuditPage: React.FC = () => {
   const {
     logs,
     loading,
     page,
-    pageSize,
+    limit,
     totalItems,
     filters,
     setPage,
+    setLimit,
     updateFilters,
     resetFilters,
     distinctEntities,
@@ -30,10 +31,62 @@ const AuditPage: React.FC = () => {
   const [showStats, setShowStats] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Summary stats
   const totalLogs = totalItems;
   const latestLog = logs.length > 0 ? logs[0] : null;
   const entitiesCount = distinctEntities.length;
+
+  // --- Global pagination integration ---
+  const { setPagination, clearPagination } = usePagination();
+
+  const handlePageChange = useCallback((newPage: number) => setPage(newPage), [setPage]);
+  const handlePageSizeChange = useCallback((newSize: number) => {
+    setLimit(newSize);
+    setPage(1);
+  }, [setLimit, setPage]);
+
+  // Store handlers in ref to avoid effect dependencies on functions
+  const handlersRef = useRef({
+    onPageChange: handlePageChange,
+    onPageSizeChange: handlePageSizeChange,
+  });
+  useEffect(() => {
+    handlersRef.current = {
+      onPageChange: handlePageChange,
+      onPageSizeChange: handlePageSizeChange,
+    };
+  }, [handlePageChange, handlePageSizeChange]);
+
+  // Track previous primitive values
+  const prevPageRef = useRef(page);
+  const prevTotalRef = useRef(totalItems);
+  const prevLimitRef = useRef(limit);
+
+  useEffect(() => {
+    const pageChanged = prevPageRef.current !== page;
+    const totalChanged = prevTotalRef.current !== totalItems;
+    const limitChanged = prevLimitRef.current !== limit;
+
+    if (pageChanged || totalChanged || limitChanged) {
+      prevPageRef.current = page;
+      prevTotalRef.current = totalItems;
+      prevLimitRef.current = limit;
+
+      setPagination({
+        currentPage: page,
+        totalItems: totalItems,
+        pageSize: limit,
+        onPageChange: handlersRef.current.onPageChange,
+        onPageSizeChange: handlersRef.current.onPageSizeChange,
+        pageSizeOptions: [10, 25, 50, 100],
+        showPageSize: true,
+      });
+    }
+  }, [page, totalItems, limit, setPagination]);
+
+  // Clear pagination on unmount
+  useEffect(() => {
+    return () => clearPagination();
+  }, [clearPagination]);
 
   return (
     <div className="p-6 space-y-6 animate-fadeIn">
@@ -123,26 +176,7 @@ const AuditPage: React.FC = () => {
           <LoadingSpinner size="medium" />
         </div>
       ) : (
-        <>
-          <AuditTable logs={logs} />
-          <div className="mt-4 flex flex-wrap justify-between items-center gap-2">
-            <div className="text-xs text-[var(--text-tertiary)]">
-              Showing {logs.length} of {totalItems} record{totalItems !== 1 ? "s" : ""}
-            </div>
-            <Pagination
-              currentPage={page}
-              totalItems={totalItems}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                // Update page size if needed; we'll handle inside hook
-                // For now we can keep fixed size
-              }}
-              pageSizeOptions={[10, 20, 50, 100]}
-              showPageSize={false} // We keep fixed pageSize for simplicity, or we can allow change
-            />
-          </div>
-        </>
+        <AuditTable logs={logs} />
       )}
     </div>
   );

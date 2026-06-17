@@ -9,7 +9,18 @@ import PitakSummaryTable from "./components/PitakSummaryTable";
 import { useBukidReports } from "./hooks/useBukidReports";
 
 const BukidReportsPage: React.FC = () => {
-  const { loading, kpis, productionData, pitakSummary, page, totalPages, setPage } = useBukidReports();
+  const {
+    loading,
+    kpis,
+    productionData,
+    pitakSummary,
+    page,
+    totalPages,
+    pageSize,
+    totalItems,
+    setPage,
+    setPageSize,
+  } = useBukidReports();
 
   if (loading) {
     return (
@@ -22,8 +33,12 @@ const BukidReportsPage: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Bukid Reports</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Farm performance and productivity analytics</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+          Bukid Reports
+        </h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          Farm performance and productivity analytics
+        </p>
       </div>
 
       {/* KPI Cards */}
@@ -39,11 +54,21 @@ const BukidReportsPage: React.FC = () => {
       {/* Summary Table */}
       <div className="bg-[var(--card-bg)] rounded-xl border border-[var(--border-color)] overflow-hidden">
         <div className="px-6 py-4 border-b border-[var(--border-color)]">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Pitak Summary</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+            Pitak Summary
+          </h3>
         </div>
-        <PitakSummaryTable pitaks={pitakSummary} page={page} />
+        <PitakSummaryTable pitaks={pitakSummary} page={page} pageSize={pageSize} />
         <div className="px-6 py-4 border-t border-[var(--border-color)]">
-          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination
+            currentPage={page}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+            showPageSize={true}
+          />
         </div>
       </div>
     </div>

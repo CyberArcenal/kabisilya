@@ -6,6 +6,7 @@ import type {
   PaginatedNotifications,
 } from "../../../api/core/reminder_log";
 import reminderLogAPI from "../../../api/core/reminder_log";
+import { useSearchParams } from "react-router-dom";
 
 interface UseNotificationLogsParams {
   page?: number;
@@ -19,8 +20,10 @@ interface UseNotificationLogsParams {
 }
 
 export const useNotificationLogs = (
+  
   initialParams?: UseNotificationLogsParams,
 ) => {
+    const [searchParams, setSearchParams] = useSearchParams();
   const [logs, setLogs] = useState<NotificationLogEntry[]>([]);
   const [pagination, setPagination] = useState<
     Omit<PaginatedNotifications, "items">
@@ -29,6 +32,14 @@ export const useNotificationLogs = (
     page: 1,
     limit: 10,
     totalPages: 0,
+  });
+    const [page, setPageState] = useState(() => {
+    const p = searchParams.get("page");
+    return p ? parseInt(p, 10) : 1;
+  });
+  const [limit, setLimitState] = useState(() => {
+    const l = searchParams.get("limit");
+    return l ? parseInt(l, 10) : 10;
   });
   const [stats, setStats] = useState<NotificationStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -129,6 +140,11 @@ export const useNotificationLogs = (
   }, [fetchLogs, fetchStats]);
 
   return {
+    limit,
+    setLimit:setLimitState,
+    totalCount: pagination.total,
+    page,
+    setPage,
     logs,
     pagination,
     stats,
@@ -137,7 +153,6 @@ export const useNotificationLogs = (
     filters,
     updateFilters,
     clearFilters,
-    setPage,
     setPageSize,
     refetch,
   };

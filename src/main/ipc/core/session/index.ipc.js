@@ -22,6 +22,7 @@ class SessionHandler {
     this.updateSession = this.importHandler("./update.ipc");
     this.deleteSession = this.importHandler("./delete.ipc");
     this.updateStatus = this.importHandler("./update_status.ipc");
+    this.copyFarmStructure = this.importHandler("./copy_farm_structure.ipc");
   }
 
   importHandler(path) {
@@ -67,6 +68,11 @@ class SessionHandler {
           return await this.handleWithTransaction(this.updateStatus, params);
         case "deleteSession":
           return await this.handleWithTransaction(this.deleteSession, params);
+        case "copyFarmStructure":
+          return await this.handleWithTransaction(
+            this.copyFarmStructure,
+            params,
+          );
         default:
           return {
             status: false,

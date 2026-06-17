@@ -1,5 +1,5 @@
 // src/renderer/pages/audit/hooks/useAuditLogs.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { AuditFilters } from "../types";
 import auditLogAPI, { type AuditLogEntry } from "../../../api/core/audit";
 import { showSuccess } from "../../../utils/notification";
@@ -9,8 +9,8 @@ export const useAuditLogs = () => {
   const [filteredLogs, setFilteredLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20); // fixed for now
-  const [totalItems, setTotalItems] = useState(0);
+  const [limit, setLimit] = useState(10);           // items per page
+  const [totalItems, setTotalItems] = useState(0);  // total filtered items
   const [filters, setFilters] = useState<AuditFilters>({
     search: "",
     entity: "",
@@ -20,10 +20,11 @@ export const useAuditLogs = () => {
     endDate: "",
   });
 
+  // fetch raw logs (only once, on mount)
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await auditLogAPI.getAll({ limit: 1000, sortBy: "timestamp", sortOrder: "DESC" });
+      const res = await auditLogAPI.getAll({ limit: 10000, sortBy: "timestamp", sortOrder: "DESC" });
       if (res.status) {
         setLogs(res.data);
       } else {
@@ -74,14 +75,16 @@ export const useAuditLogs = () => {
       filtered = filtered.filter((log) => new Date(log.timestamp) <= end);
     }
 
-    // Sort by timestamp descending (already sorted from API, but keep)
+    // Sort by timestamp descending (already sorted, but keep)
     filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     setFilteredLogs(filtered);
     setTotalItems(filtered.length);
-    // Reset to first page when filters change
-    setPage(1);
+    setPage(1); // reset to first page when filters change
   }, [logs, filters]);
+
+  // Provide paginated slice
+  const paginatedLogs = filteredLogs.slice((page - 1) * limit, page * limit);
 
   const updateFilters = (newFilters: Partial<AuditFilters>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
@@ -100,7 +103,6 @@ export const useAuditLogs = () => {
 
   const refresh = () => fetchLogs();
 
-  // Export filtered logs to CSV
   const exportCSV = () => {
     if (filteredLogs.length === 0) {
       showSuccess("No logs to export");
@@ -128,23 +130,19 @@ export const useAuditLogs = () => {
     showSuccess("Export started");
   };
 
-  // Get distinct values for dropdowns
   const distinctEntities = [...new Set(logs.map((log) => log.entity).filter(Boolean))];
   const distinctActions = [...new Set(logs.map((log) => log.action).filter(Boolean))];
   const distinctUsers = [...new Set(logs.map((log) => log.user).filter(Boolean))];
 
-  // Paginate logs for current page
-  const startIndex = (page - 1) * pageSize;
-  const paginatedLogs = filteredLogs.slice(startIndex, startIndex + pageSize);
-
   return {
-    logs: paginatedLogs,
+    logs: paginatedLogs,           // already sliced
     loading,
     page,
-    pageSize,
+    limit,
     totalItems,
     filters,
     setPage,
+    setLimit,
     updateFilters,
     resetFilters,
     distinctEntities,

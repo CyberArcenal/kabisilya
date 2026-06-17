@@ -63,7 +63,10 @@ export interface SessionFilters extends BaseFilters {
 class SessionAPI {
   private channel = "session";
 
-  private async call<T = any>(method: string, params: Record<string, any> = {}): Promise<T> {
+  private async call<T = any>(
+    method: string,
+    params: Record<string, any> = {},
+  ): Promise<T> {
     if (!window.backendAPI?.session) {
       throw new Error(`Electron API (${this.channel}) not available`);
     }
@@ -79,8 +82,13 @@ class SessionAPI {
           status: true,
           message: response.message,
           data: {
-            items: response.data,           // array of sessions
-            pagination: response.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+            items: response.data, // array of sessions
+            pagination: response.pagination || {
+              page: 1,
+              limit: 50,
+              total: 0,
+              pages: 0,
+            },
           },
         };
       }
@@ -93,7 +101,9 @@ class SessionAPI {
   async getById(id: number): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<SessionResponse>("getSessionById", { id });
+      const response = await this.call<SessionResponse>("getSessionById", {
+        id,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch session");
     } catch (error: any) {
@@ -113,7 +123,10 @@ class SessionAPI {
 
   async getStats(sessionId?: number): Promise<SessionStatsResponse> {
     try {
-      const response = await this.call<SessionStatsResponse>("getSessionStats", { sessionId });
+      const response = await this.call<SessionStatsResponse>(
+        "getSessionStats",
+        { sessionId },
+      );
       if (response.status) return response;
       throw new Error(response.message || "Failed to fetch stats");
     } catch (error: any) {
@@ -135,7 +148,10 @@ class SessionAPI {
   async update(id: number, data: SessionUpdateData): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<SessionResponse>("updateSession", { id, ...data });
+      const response = await this.call<SessionResponse>("updateSession", {
+        id,
+        ...data,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update session");
     } catch (error: any) {
@@ -146,7 +162,10 @@ class SessionAPI {
   async updateStatus(id: number, status: string): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<SessionResponse>("updateStatus", { id, status });
+      const response = await this.call<SessionResponse>("updateStatus", {
+        id,
+        status,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to update session status");
     } catch (error: any) {
@@ -157,7 +176,9 @@ class SessionAPI {
   async delete(id: number): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<SessionResponse>("deleteSession", { id });
+      const response = await this.call<SessionResponse>("deleteSession", {
+        id,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to delete session");
     } catch (error: any) {
@@ -168,11 +189,35 @@ class SessionAPI {
   async restore(id: number): Promise<SessionResponse> {
     try {
       if (!id || id <= 0) throw new Error("Invalid ID");
-      const response = await this.call<SessionResponse>("restoreSession", { id });
+      const response = await this.call<SessionResponse>("restoreSession", {
+        id,
+      });
       if (response.status) return response;
       throw new Error(response.message || "Failed to restore session");
     } catch (error: any) {
       throw new Error(error.message || "Failed to restore session");
+    }
+  }
+
+  async copyFarmStructure(
+    sourceSessionId: number,
+    targetSessionId: number,
+    bukidIds?: number[],
+    includeAssignments?: boolean,
+  ): Promise<ApiResponse<any>> {
+    try {
+      if (!sourceSessionId || !targetSessionId)
+        throw new Error("Session IDs are required");
+      const response = await this.call<any>("copyFarmStructure", {
+        sourceSessionId,
+        targetSessionId,
+        bukidIds: bukidIds || [],
+        includeAssignments: includeAssignments || false,
+      });
+      if (response.status) return response;
+      throw new Error(response.message || "Failed to copy farm structure");
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to copy farm structure");
     }
   }
 }

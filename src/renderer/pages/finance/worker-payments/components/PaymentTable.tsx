@@ -22,7 +22,9 @@ interface PaymentTableProps {
 }
 
 const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(amount);
+  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
+    amount,
+  );
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   pending: { bg: "#fef3c7", text: "#92400e" },
@@ -34,7 +36,10 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const colors = statusColors[status] || { bg: "#f3f4f6", text: "#6b7280" };
   return (
-    <span className="px-2 py-1 text-xs rounded-full" style={{ backgroundColor: colors.bg, color: colors.text }}>
+    <span
+      className="px-2 py-1 text-xs rounded-full"
+      style={{ backgroundColor: colors.bg, color: colors.text }}
+    >
       {status}
     </span>
   );
@@ -63,7 +68,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     );
   }
 
-  const allSelected = payments.length > 0 && payments.every(p => selectedIds.includes(p.id));
+  const allSelected =
+    payments.length > 0 && payments.every((p) => selectedIds.includes(p.id));
   const someSelected = selectedIds.length > 0 && !allSelected;
 
   const renderSortIndicator = (field: string) => {
@@ -87,42 +93,58 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 className="rounded border-[var(--border-color)] cursor-pointer"
               />
             </th>
-            <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("worker.name")}>
+            <th
+              className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("worker.name")}
+            >
               Worker {renderSortIndicator("worker.name")}
             </th>
-            <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("pitak.location")}>
+            <th
+              className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("pitak.location")}
+            >
               Pitak {renderSortIndicator("pitak.location")}
             </th>
-            <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("session.name")}>
+            <th
+              className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("session.name")}
+            >
               Session {renderSortIndicator("session.name")}
             </th>
-            <th className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("grossPay")}>
+            <th
+              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("grossPay")}
+            >
               Gross {renderSortIndicator("grossPay")}
             </th>
             <th className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)]">
               Deduct
             </th>
-            <th className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("amountPaid")}>
+            <th
+              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("amountPaid")}
+            >
               Paid {renderSortIndicator("amountPaid")}
             </th>
-            <th className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("netPay")}>
+            <th
+              className="text-right py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("netPay")}
+            >
               Net {renderSortIndicator("netPay")}
             </th>
-            <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("paymentDate")}>
+            <th
+              className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("paymentDate")}
+            >
               Pay Date {renderSortIndicator("paymentDate")}
             </th>
             <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)]">
               Last Pay
             </th>
-            <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
-                onClick={() => onSort?.("status")}>
+            <th
+              className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)] cursor-pointer hover:text-[var(--primary-color)]"
+              onClick={() => onSort?.("status")}
+            >
               Status {renderSortIndicator("status")}
             </th>
             <th className="text-left py-2 px-3 font-semibold text-[var(--text-secondary)]">
@@ -132,7 +154,10 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         </thead>
         <tbody>
           {payments.map((payment) => (
-            <tr key={payment.id} className="border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors">
+            <tr
+              key={payment.id}
+              className="border-b border-[var(--border-color)] hover:bg-[var(--card-hover-bg)] transition-colors"
+            >
               <td className="py-1.5 px-3">
                 <input
                   type="checkbox"
@@ -154,9 +179,17 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 {formatCurrency(payment.grossPay)}
               </td>
               <td className="py-1.5 px-3 text-right text-[var(--text-secondary)] text-xs">
-                {formatCurrency((payment.manualDeduction || 0) + (payment.totalDebtDeduction || 0))}
+                {formatCurrency(
+                  (payment.manualDeduction || 0) +
+                    (payment.debtDeductionTotal || 0),
+                )}
                 {payment.totalDebtDeduction > 0 && (
-                  <span className="ml-1 text-[10px] text-red-500" title="Debt deduction">(debt)</span>
+                  <span
+                    className="ml-1 text-[10px] text-red-500"
+                    title="Debt deduction"
+                  >
+                    (debt)
+                  </span>
                 )}
               </td>
               <td className="py-1.5 px-3 text-right text-[var(--text-secondary)] text-xs">
@@ -168,11 +201,15 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               <td className="py-1.5 px-3 text-[var(--text-secondary)] text-xs">
                 <div className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString() : "—"}
+                  {payment.paymentDate
+                    ? new Date(payment.paymentDate).toLocaleDateString()
+                    : "—"}
                 </div>
               </td>
               <td className="py-1.5 px-3 text-[var(--text-secondary)] text-xs">
-                {payment.lastPaymentDate ? new Date(payment.lastPaymentDate).toLocaleDateString() : "—"}
+                {payment.lastPaymentDate
+                  ? new Date(payment.lastPaymentDate).toLocaleDateString()
+                  : "—"}
               </td>
               <td className="py-1.5 px-3">
                 <StatusBadge status={payment.status} />

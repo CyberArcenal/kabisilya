@@ -7,7 +7,7 @@ export const usePitakProductivity = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PitakProductivityData | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -27,8 +27,15 @@ export const usePitakProductivity = () => {
     fetchData();
   }, [fetchData]);
 
+  // Reset page when pageSize changes
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  const totalItems = data?.pitaks?.length || 0;
+  const totalPages = Math.ceil(totalItems / pageSize);
+
   const paginatedPitaks = data?.pitaks?.slice((page - 1) * pageSize, page * pageSize) || [];
-  const totalPages = Math.ceil((data?.pitaks?.length || 0) / pageSize);
 
   return {
     loading,
@@ -39,7 +46,10 @@ export const usePitakProductivity = () => {
     financial: data?.financial,
     page,
     totalPages,
+    pageSize,
+    totalItems,
     setPage,
+    setPageSize,
     refresh: fetchData,
   };
 };
