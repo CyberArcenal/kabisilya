@@ -1,4 +1,4 @@
-name: Build & Release FarmTrac
+name: Build & Release Kabisilya
 
 on:
   push:
