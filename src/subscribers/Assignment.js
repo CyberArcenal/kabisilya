@@ -44,7 +44,7 @@ class AssignmentSubscriber {
         if (!hydrated) return;
         const pitakId = hydrated.pitak?.id;
         const sessionId = hydrated.session?.id;
-        if (pitakId && sessionId) {
+        if (pitakId && sessionId && newStatus !== 'completed') {
           await this.transitionService.recalculateLuWangForPitakSession(pitakId, sessionId, "system", queryRunner);
         }
         switch (newStatus) {
