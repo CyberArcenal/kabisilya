@@ -5,6 +5,7 @@ import BukidSelect from "../../../../components/Selects/BukidSelect";
 import Modal from "../../../../components/UI/Modal";
 import Button from "../../../../components/UI/Button";
 import { showWarning } from "../../../../utils/notification";
+import PitakCalculatorModal from "./PitakCalculatorModal";
 
 interface Props {
   isOpen: boolean;
@@ -13,7 +14,12 @@ interface Props {
   initialData?: (PitakCreateData & { id?: number }) | null;
 }
 
-const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
+const PitakFormModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialData,
+}) => {
   const [form, setForm] = useState<PitakCreateData>({
     bukidId: 0,
     location: "",
@@ -21,13 +27,16 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
-
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   useEffect(() => {
     if (initialData) {
       setForm({
         bukidId: initialData.bukidId,
         location: initialData.location || "",
-        totalLuwang: initialData.totalLuwang !== undefined ? initialData.totalLuwang : (initialData.area ?? undefined),
+        totalLuwang:
+          initialData.totalLuwang !== undefined
+            ? initialData.totalLuwang
+            : (initialData.area ?? undefined),
         description: initialData.description || "",
       });
     } else {
@@ -40,12 +49,17 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
     }
   }, [initialData, isOpen]);
 
+  const handleCalculatorConfirm = (luwang: number) => {
+    setForm((prev) => ({ ...prev, totalLuwang: luwang }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.bukidId) {
       showWarning("Please select a farm.");
       return;
     }
+
     setSubmitting(true);
     try {
       const payload: PitakCreateData = {
@@ -72,56 +86,109 @@ const PitakFormModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialDa
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={initialData?.id ? "Edit Plot" : "Add Plot"} size="md">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Farm *</label>
-          <BukidSelect
-            value={form.bukidId}
-            onChange={(id) => setForm({ ...form, bukidId: id || 0 })}
-            placeholder="Select farm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Location</label>
-          <input
-            type="text"
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-            placeholder="Auto‑generate if empty"
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Area (luwang)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={form.totalLuwang ?? ""}
-            onChange={(e) => setForm({ ...form, totalLuwang: e.target.value ? parseFloat(e.target.value) : undefined })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Description</label>
-          <textarea
-            rows={2}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--text-primary)" }}
-          />
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" loading={submitting}>
-            {initialData?.id ? "Update" : "Create"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={initialData?.id ? "Edit Plot" : "Add Plot"}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+              Farm *
+            </label>
+            <BukidSelect
+              value={form.bukidId}
+              onChange={(id) => setForm({ ...form, bukidId: id || 0 })}
+              placeholder="Select farm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+              Location
+            </label>
+            <input
+              type="text"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              placeholder="Auto‑generate if empty"
+              className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+              Area (luwang)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.01"
+                value={form.totalLuwang ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    totalLuwang: e.target.value
+                      ? parseFloat(e.target.value)
+                      : undefined,
+                  })
+                }
+                className="flex-1 px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                style={{
+                  backgroundColor: "var(--input-bg)",
+                  borderColor: "var(--input-border)",
+                  color: "var(--text-primary)",
+                }}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCalculatorOpen(true)}
+                title="Open calculator"
+              >
+                Calculator
+              </Button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+              Description
+            </label>
+            <textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+              style={{
+                backgroundColor: "var(--input-bg)",
+                borderColor: "var(--input-border)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" loading={submitting}>
+              {initialData?.id ? "Update" : "Create"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      <PitakCalculatorModal
+        isOpen={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+        onConfirm={handleCalculatorConfirm}
+      />
+    </>
   );
 };
 
